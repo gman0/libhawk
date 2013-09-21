@@ -1,0 +1,53 @@
+What is it?
+-----------
+libhawk is a GUI-agnostic file-manager library for Linux
+
+
+Building
+--------
+libhawk is written in C++11 so you'll need a C++11 compliant compiler
+(that'd be g++ >=4.8.1 or llvm/clang >=3.0).
+
+libhawk is using CMake build system so before you start make sure it's
+installed on your system.
+
+As for the actual building:
+	cd to your build directory (let's say ./build/)
+	$ cd build/
+
+	tell cmake where's the libhawk's CMake config file
+	$ cmake ../src
+
+	run make
+	$ make
+
+	(optional) now you can install libhawk to make it available
+	system-wide
+	# make install
+
+Both shared and static libraries will be created - libhawk.so, libhawk.a
+respectively.
+
+
+How do I run libhawk?
+---------------------
+You don't. As it's stated in the description, this is a library not
+capable of running as a standalone program. That's what a hawk back-end
+is for (ie. hawk-gtk3).
+
+
+Usage
+-----
+Refer to the API reference manual and hawk-gtk3.
+
+
+Links
+-----
+libhawk git repo: https://github.com/gman0/libhawk.git
+hawk-gtk3 git repo: https://github.com/gman0/hawk-gtk3.git
+
+
+Contact
+-------
+my email: <gman@codefreax.org>
+
