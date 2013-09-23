@@ -25,13 +25,12 @@ As for the actual building:
 	system-wide
 	# make install
 
-Both shared and static libraries will be created - libhawk.so, libhawk.a
-respectively.
+A shared library libhawk.so will be created.
 
 
 How do I run libhawk?
 ---------------------
-You don't. As it's stated in the description, this is a library not
+You don't. As it's stated in the description, this is a library - it's not
 capable of running as a standalone program. That's what a hawk back-end
 is for (ie. hawk-gtk3).
 
