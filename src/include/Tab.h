@@ -1,0 +1,47 @@
+/*
+	Copyright (C) 2013 Róbert "gman" Vašek <gman@codefreax.org>
+
+	This file is part of libhawk.
+
+	libhawk is free software: you can redistribute it and/or modify
+	it under the terms of the GNU General Public License as published by
+	the Free Software Foundation, either version 2 of the License, or
+	(at your option) any later version.
+
+	libhawk is distributed in the hope that it will be useful,
+	but WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+	GNU General Public License for more details.
+
+	You should have received a copy of the GNU General Public License
+	along with libhawk.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
+#ifndef HAWK_TAB_H
+#define HAWK_TAB_H
+
+#include <boost/filesystem/path.hpp>
+#include <vector>
+#include "Column.h"
+
+namespace hawk {
+	class Tab
+	{
+	private:
+		// PWD usually stands for Print Working Directory
+		// but there's no printing involved as this only
+		// holds the current working directory.
+		boost::filesystem::path m_pwd;
+
+		std::vector<Column> m_columns;
+
+	public:
+		Tab(const boost::filesystem::path& pwd) : m_pwd{pwd} {}
+		Tab(boost::filesystem::path&& pwd) : m_pwd{pwd} {}
+
+		const boost::filesystem::path& get_pwd() const;
+		void set_pwd(const boost::filesystem::path& pwd);
+	};
+}
+
+#endif // HAWK_TAB_H
