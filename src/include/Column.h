@@ -27,6 +27,9 @@ namespace hawk {
 	{
 	private:
 		Handler* m_handler;
+
+	public:
+		Column(Handler* handler) : m_handler{handler} {}
 	};
 }
 
