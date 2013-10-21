@@ -26,14 +26,13 @@ namespace hawk {
 	template <typename Key, typename T>
 	class Cache
 	{
-	private:
+	protected:
 		T* m_active_cache;
 		std::unordered_map<Key, T*> m_cache_dictionary;
 
 	public:
-		Cache(const Cache&) = delete;
 		Cache& operator=(const Cache&) = delete;
-		~Cache();
+		virtual ~Cache();
 
 		virtual T* add_dir_entry(const Key& k) = 0;
 		void remove_active();
