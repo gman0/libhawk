@@ -49,18 +49,18 @@ namespace hawk {
 		List_dir(const boost::filesystem::path& path, const std::string& type);
 		~List_dir();
 
-		// navigate
-		// move_cursor
-
-	// private:
-		// ;
+		// TODO: navigate, move_cursor etc...
 	};
 
 	class Dir_cache : public Cache<size_t, std::vector<List_dir::Dir_entry>>
 	{
 	public:
 		using Dir_vector = std::vector<List_dir::Dir_entry>;
-		virtual Dir_vector* add_dir_entry(const size_t& hash);
+
+		Dir_cache(const Cache<size_t, std::vector<List_dir::Dir_entry>>::Update_lambda&);
+		Dir_cache(Cache<size_t, std::vector<List_dir::Dir_entry>>::Update_lambda&&);
+
+		virtual Dir_vector* add_dir_entry(time_t timestamp, const size_t& hash);
 	};
 }
 

@@ -21,18 +21,36 @@
 
 using namespace hawk;
 
-List_dir::List_dir(const boost::filesystem::path& path, const std::string& type)
+List_dir::List_dir(const boost::filesystem::path& path,
+	const std::string& type)
 	:
-	Handler{path, type},
-	m_cache{new Dir_cache}
-{}
+	Handler{path, type}
+{
+	Cache<size_t, std::vector<List_dir::Dir_entry>>::Update_lambda f =
+		[](Dir_cache::Dir_vector*){return;}; // <- TODO
+	m_cache = new Dir_cache(f);
+}
 
 List_dir::~List_dir()
 {
 	delete m_cache;
 }
 
-Dir_cache::Dir_vector* Dir_cache::add_dir_entry(const size_t& hash)
+Dir_cache::Dir_cache(
+	const Cache<size_t, std::vector<List_dir::Dir_entry>>::Update_lambda& f)
+	:
+	Cache(f)
+{}
+
+Dir_cache::Dir_cache(
+	Cache<size_t, std::vector<List_dir::Dir_entry>>::Update_lambda&& f)
+	:
+	Cache(f)
+{}
+
+
+Dir_cache::Dir_vector* Dir_cache::add_dir_entry(time_t timestamp,
+	const size_t& hash)
 {
-	return (m_cache_dictionary[hash] = new Dir_vector);
+	return (m_cache_dictionary[hash] = {timestamp, new Dir_vector}).second;
 }
