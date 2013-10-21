@@ -23,6 +23,18 @@
 using namespace hawk;
 
 template <typename Key, typename T>
+Cache<Key, T>::Cache(Cache::Update_lambda&& update_closure)
+	:
+	m_update_closure{update_closure}
+{}
+
+template <typename Key, typename T>
+Cache<Key, T>::Cache(const Cache::Update_lambda& update_closure)
+	:
+	m_update_closure{update_closure}
+{}
+
+template <typename Key, typename T>
 Cache<Key, T>::~Cache()
 {
 	for (auto it : m_cache_dictionary)
@@ -50,18 +62,31 @@ void Cache<Key, T>::remove_active()
 }
 
 template <typename Key, typename T>
-T* Cache<Key, T>::switch_cache(const Key& k)
+T* Cache<Key, T>::switch_cache(std::time_t timestamp, const Key& k)
 {
 	if (m_cache_dictionary.find(k) == m_cache_dictionary.end())
 	{
-		auto insert_pair = m_cache_dictionary.insert(add_dir_entry(k));
+		auto insert_pair = m_cache_dictionary.insert({timestamp, add_dir_entry(k)});
 
 		if (!insert_pair->second)
 			throw std::runtime_error(
 					"Cannot insert a new cache dictionary entry");
 
-		return (m_active_cache = *(insert_pair->first));
+		return (m_active_cache = (*(insert_pair->first))->second);
 	}
 	else
-		return (m_active_cache = m_cache_dictionary[k]);
+	{
+		Cache_dictionary_entry dir_ent = m_cache_dictionary[k];
+		update_cache(timestamp, dir_ent);
+
+		return (m_active_cache = dir_ent.second);
+	}
+}
+
+template <typename Key, typename T>
+void Cache<Key, T>::update_cache(std::time_t timestamp,
+	Cache::Cache_dictionary_entry& ent)
+{
+	if (timestamp != ent.first)
+		m_update_closure(ent.second);
 }

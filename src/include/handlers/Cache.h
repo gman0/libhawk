@@ -21,23 +21,47 @@
 #define HAWK_CACHE_H
 
 #include <unordered_map>
+#include <utility>
+#include <functional>
+#include <ctime>
 
 namespace hawk {
 	template <typename Key, typename T>
 	class Cache
 	{
+	public:
+		// time_t (timestamp) is used to determine whether we need
+		// to update the cache
+		using Cache_dictionary_entry = std::pair<std::time_t, T*>;
+
+		// ...in that case we'll update the cache by calling
+		// this lambda
+		using Update_lambda = std::function<void(T*)>;
+
 	protected:
 		T* m_active_cache;
-		std::unordered_map<Key, T*> m_cache_dictionary;
+		std::unordered_map<Key,
+			Cache_dictionary_entry> m_cache_dictionary;
+
+	private:
+		Update_lambda m_update_closure;
 
 	public:
+		Cache(Update_lambda&& update_closure);
+		Cache(const Update_lambda& update_closure);
+		Cache(Cache&&) = delete;
 		Cache& operator=(const Cache&) = delete;
 		virtual ~Cache();
 
-		virtual T* add_dir_entry(const Key& k) = 0;
+		virtual T* add_dir_entry(std::time_t timestamp, const Key& k) = 0;
 		void remove_active();
-		T* switch_cache(const Key& k);
+		T* switch_cache(std::time_t timestamp, const Key& k);
 		T* get_active_cache() { return m_active_cache; }
+		void force_update_active();
+
+	private:
+		void update_cache(std::time_t timestamp,
+			Cache_dictionary_entry& ent);
 	};
 }
 
