@@ -26,16 +26,15 @@
 namespace hawk {
 	class Handler
 	{
+	protected:
+		const boost::filesystem::path m_path;
+
 	private:
-		// this can be a reference because Column always
-		// outlives its Handler
-		const boost::filesystem::path& m_path;
 		size_t m_type; // hash value of type
 
 	public:
 		// type as in the mime type
 		Handler(const boost::filesystem::path& path, const std::string& type);
-		virtual const char* next() = 0; // get the next item in the item container (if any)
 
 		size_t get_type() const;
 		bool operator==(const Handler& h);
