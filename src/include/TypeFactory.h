@@ -21,13 +21,16 @@
 #define HAWK_TYPE_FACTORY_H
 
 #include <unordered_map>
+#include <functional>
 
 namespace hawk {
 	class Handler;
-	using Type_product = Handler*(*)();
 
 	class Type_factory
 	{
+	public:
+		using Type_product = std::function<Handler*()>;
+
 	private:
 		std::unordered_map<size_t, Type_product> m_types;
 
