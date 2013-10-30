@@ -25,6 +25,8 @@
 #include "Column.h"
 
 namespace hawk {
+	class Type_factory;
+
 	class Tab
 	{
 	private:
@@ -35,9 +37,12 @@ namespace hawk {
 
 		std::vector<Column> m_columns;
 
+		Type_factory* m_type_factory;
+
 	public:
-		Tab(const boost::filesystem::path& pwd) : m_pwd{pwd} {}
-		Tab(boost::filesystem::path&& pwd) : m_pwd{pwd} {}
+		Tab(const boost::filesystem::path& pwd, unsigned cols,
+			Type_factory* tf);
+		// Tab(boost::filesystem::path&& pwd, unsigned cols);
 
 		const boost::filesystem::path& get_pwd() const;
 		void set_pwd(const boost::filesystem::path& pwd);
