@@ -24,16 +24,23 @@
 #include "Tab.h"
 
 namespace hawk {
-	using Tab_iterator = typename std::vector<Tab>::iterator;
 
 	class Tab_manager
 	{
+	public:
+		using Tab_iterator = typename std::vector<Tab>::iterator;
+
 	private:
 		std::vector<Tab> m_tabs;
 		Tab_iterator m_active_tab;
 
+		Type_factory* m_type_factory;
+
 	public:
-		Tab_manager() : m_active_tab {} {}
+		Tab_manager(Type_factory* tf)
+			: m_active_tab{}, m_type_factory{tf}
+		{}
+
 		Tab_manager(const Tab_manager& tm) = delete;
 
 		Tab_iterator& get_active_tab();
