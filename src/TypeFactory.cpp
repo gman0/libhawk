@@ -22,17 +22,17 @@
 
 using namespace hawk;
 
-void Type_factory::register_type(size_t type, Type_product tp)
+void Type_factory::register_type(size_t type, Type_factory::Type_product tp)
 {
 	m_types[type] = tp;
 }
 
-Type_product Type_factory::operator[](size_t type)
+Type_factory::Type_product Type_factory::operator[](size_t type)
 {
 	auto tp_iterator = m_types.find(type);
 
 	if (tp_iterator == m_types.end())
-		return nullptr;
+		return Type_product{nullptr};
 
-	return *(tp_iterator->second);
+	return tp_iterator->second;
 }
