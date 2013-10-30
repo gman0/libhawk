@@ -17,40 +17,50 @@
 	along with libhawk.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <exception>
+#include <utility>
+
+#include <boost/functional/hash.hpp>
+// ^ this resolves an undefined reference to boost::hash_range<>
+
 #include "handlers/dir.h"
+#include "handlers/Cache_impl.h"
 
 using namespace hawk;
+using namespace boost::filesystem;
+
+constexpr int cache_threshold = 1024;
 
 List_dir::List_dir(const boost::filesystem::path& path,
 	const std::string& type)
 	:
-	Handler{path, type}
+	Handler{path, type},
+	m_cache{([this](List_dir::Dir_cache* dc){ fill_cache(dc); })}
 {
-	Cache<size_t, std::vector<List_dir::Dir_entry>>::Update_lambda f =
-		[](Dir_cache::Dir_vector*){return;}; // <- TODO
-	m_cache = new Dir_cache(f);
+	if (!is_directory(path))
+		throw std::runtime_error(
+				"Current path is not a directory");
+
+	m_active_cache =
+		m_cache.switch_cache(last_write_time(path), hash_value(path));
 }
 
-List_dir::~List_dir()
+void List_dir::fill_cache(List_dir::Dir_cache* dc)
 {
-	delete m_cache;
-}
+	Dir_vector& vec = dc->vec;
+	vec.clear();
 
-Dir_cache::Dir_cache(
-	const Cache<size_t, std::vector<List_dir::Dir_entry>>::Update_lambda& f)
-	:
-	Cache(f)
-{}
+	// free up some space if we need to
+	if (vec.size() > cache_threshold)
+		vec.resize(cache_threshold);
 
-Dir_cache::Dir_cache(
-	Cache<size_t, std::vector<List_dir::Dir_entry>>::Update_lambda&& f)
-	:
-	Cache(f)
-{}
+	directory_iterator end;
+	for (directory_iterator dir_it{m_path}; dir_it != end; ++dir_it)
+	{
+		// const path& p = dir_it->path();
+		// vec.push_back({last_write_time(p), p, dir_it->status()});
+		vec.push_back(dir_it->path());
+	}
 
-
-Dir_cache::Dir_vector* Dir_cache::add_dir_entry(time_t timestamp,
-	const size_t& hash)
-{
-	return (m_cache_dictionary[hash] = {timestamp, new Dir_vector}).second;
+	dc->cursor = vec.begin();
 }
