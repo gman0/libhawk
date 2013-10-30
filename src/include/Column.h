@@ -21,15 +21,22 @@
 #define HAWK_COLUMN_H
 
 #include "Handler.h"
+#include "TypeFactory.h"
 
 namespace hawk {
 	class Column
 	{
 	private:
+		boost::filesystem::path m_path;
 		Handler* m_handler;
 
 	public:
-		Column(Handler* handler) : m_handler{handler} {}
+		Column(const boost::filesystem::path& path,
+			Type_factory::Type_product tp);
+		Column(boost::filesystem::path&& path,
+			Type_factory::Type_product tp);
+
+		~Column();
 	};
 }
 
