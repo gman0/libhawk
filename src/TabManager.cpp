@@ -22,17 +22,20 @@
 
 using namespace hawk;
 
-Tab_iterator& Tab_manager::get_active_tab()
+// TODO: read this from the config file
+constexpr unsigned columns = 3;
+
+Tab_manager::Tab_iterator& Tab_manager::get_active_tab()
 {
 	return m_active_tab;
 }
 
-void Tab_manager::set_active_tab(Tab_iterator& tab)
+void Tab_manager::set_active_tab(Tab_manager::Tab_iterator& tab)
 {
 	m_active_tab = tab;
 }
 
-void Tab_manager::set_active_tab(Tab_iterator&& tab)
+void Tab_manager::set_active_tab(Tab_manager::Tab_iterator&& tab)
 {
 	m_active_tab = std::move(tab);
 }
@@ -42,25 +45,25 @@ Tab& Tab_manager::get_tabref(int tab)
 	return m_tabs[tab];
 }
 
-Tab_iterator& Tab_manager::add_tab()
+Tab_manager::Tab_iterator& Tab_manager::add_tab()
 {
-	m_tabs.push_back({m_active_tab->get_pwd()});
+	m_tabs.push_back({m_active_tab->get_pwd(), columns, m_type_factory});
 	return (m_active_tab = m_tabs.end()--);
 }
 
-Tab_iterator& Tab_manager::add_tab(const boost::filesystem::path& pwd)
+Tab_manager::Tab_iterator& Tab_manager::add_tab(const boost::filesystem::path& pwd)
 {
-	m_tabs.push_back({pwd});
+	m_tabs.push_back({pwd, columns, m_type_factory});
 	return (m_active_tab = m_tabs.end()--);
 }
 
-Tab_iterator& Tab_manager::add_tab(boost::filesystem::path&& pwd)
+Tab_manager::Tab_iterator& Tab_manager::add_tab(boost::filesystem::path&& pwd)
 {
-	m_tabs.push_back({std::move(pwd)});
+	m_tabs.push_back({std::move(pwd), columns, m_type_factory});
 	return (m_active_tab = m_tabs.end()--);
 }
 
-void Tab_manager::remove_tab(Tab_iterator& tab)
+void Tab_manager::remove_tab(Tab_manager::Tab_iterator& tab)
 {
 	if (m_tabs.size() <= 1) return; // don't delete our only tab!
 
