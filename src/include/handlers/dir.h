@@ -28,39 +28,42 @@
 #include "handlers/Cache.h"
 
 namespace hawk {
-	class Dir_cache;
 	class List_dir : public Handler
 	{
 	public:
+		/*
 		struct Dir_entry
 		{
 			std::time_t timestamp;
-			std::string name;
+			boost::filesystem::path path;
 			boost::filesystem::file_status status;
 		};
+		*/
 
-		using Dir_cursor = std::vector<Dir_entry>::iterator;
+		using Dir_entry = boost::filesystem::path;
+
+		using Dir_vector = std::vector<Dir_entry>;
+		using Dir_cursor = Dir_vector::iterator;
+
+		struct Dir_cache
+		{
+			Dir_vector vec;
+			Dir_cursor cursor;
+		};
 
 	private:
-		Dir_cache* m_cache;
+		Cache<size_t, Dir_cache> m_cache;
 		Dir_cursor m_cursor;
+		Dir_cache* m_active_cache;
 
 	public:
 		List_dir(const boost::filesystem::path& path, const std::string& type);
-		~List_dir();
+		const Dir_cache* read() { return m_active_cache; }
 
 		// TODO: navigate, move_cursor etc...
-	};
 
-	class Dir_cache : public Cache<size_t, std::vector<List_dir::Dir_entry>>
-	{
-	public:
-		using Dir_vector = std::vector<List_dir::Dir_entry>;
-
-		Dir_cache(const Cache<size_t, std::vector<List_dir::Dir_entry>>::Update_lambda&);
-		Dir_cache(Cache<size_t, std::vector<List_dir::Dir_entry>>::Update_lambda&&);
-
-		virtual Dir_vector* add_dir_entry(time_t timestamp, const size_t& hash);
+	private:
+		void fill_cache(Dir_cache* dc);
 	};
 }
 
