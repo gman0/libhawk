@@ -57,7 +57,7 @@ namespace hawk {
 		Dir_cache* m_active_cache;
 
 	public:
-		List_dir(const boost::filesystem::path& path, const std::string& type);
+		List_dir(const boost::filesystem::path& path);
 		const Dir_cache* read() { return m_active_cache; }
 
 		// TODO: navigate, move_cursor etc...
