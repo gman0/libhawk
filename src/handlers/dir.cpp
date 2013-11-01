@@ -25,16 +25,16 @@
 
 #include "handlers/dir.h"
 #include "handlers/Cache_impl.h"
+#include "handlers/dir_hash.h"
 
 using namespace hawk;
 using namespace boost::filesystem;
 
 constexpr int cache_threshold = 1024;
 
-List_dir::List_dir(const boost::filesystem::path& path,
-	const std::string& type)
+List_dir::List_dir(const boost::filesystem::path& path)
 	:
-	Handler{path, type},
+	Handler{path, get_handler_hash<List_dir>()},
 	m_cache{([this](List_dir::Dir_cache* dc){ fill_cache(dc); })}
 {
 	if (!is_directory(path))
