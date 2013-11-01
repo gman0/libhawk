@@ -11,6 +11,12 @@ libhawk is written in C++11 so you'll need a C++11 compliant compiler
 libhawk is using CMake build system so before you start make sure it's
 installed on your system.
 
+Dependencies
+------------
+	libboost-system-dev
+	libboost-filesystem-dev
+	libmagic-dev
+
 As for the actual building:
 	cd to your build directory (let's say ./build/)
 	$ cd build/
