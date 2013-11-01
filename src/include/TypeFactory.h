@@ -22,6 +22,7 @@
 
 #include <unordered_map>
 #include <functional>
+#include <boost/filesystem/path.hpp>
 
 namespace hawk {
 	class Handler;
@@ -29,13 +30,17 @@ namespace hawk {
 	class Type_factory
 	{
 	public:
-		using Type_product = std::function<Handler*()>;
+		using Type_product =
+			std::function<Handler*(const boost::filesystem::path&)>;
 
 	private:
 		std::unordered_map<size_t, Type_product> m_types;
 
 	public:
-		void register_type(size_t type, Type_product tp);
+		Type_factory() {}
+		Type_factory(const Type_factory&) = delete;
+
+		void register_type(size_t type, const Type_product& tp);
 		Type_product operator[](size_t type);
 	};
 }
