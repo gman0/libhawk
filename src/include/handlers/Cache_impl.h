@@ -22,6 +22,16 @@
 
 namespace hawk {
 	template <typename Key, typename T>
+	Cache<Key, T>& Cache<Key, T>::operator=(Cache&& c)
+	{
+		m_active_cache = c.m_active_cache;
+		c.m_active_cache = nullptr;
+		m_cache_dictionary = std::move(c.m_cache_dictionary);
+
+		return *this;
+	}
+
+	template <typename Key, typename T>
 	void Cache<Key, T>::remove_active()
 	{
 		for (auto& it : m_cache_dictionary)

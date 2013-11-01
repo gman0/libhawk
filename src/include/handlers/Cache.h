@@ -47,14 +47,21 @@ namespace hawk {
 		Update_lambda m_update_closure;
 
 	public:
-		Cache(Update_lambda&& update_closure)
-			: m_update_closure{update_closure} {}
-
 		Cache(const Update_lambda& update_closure)
 			: m_update_closure{update_closure} {}
 
-		Cache(Cache&&) = delete;
+		Cache(Update_lambda&& update_closure)
+			: m_update_closure{std::move(update_closure)} {}
+
+		Cache(Cache&& c)
+			:
+			m_active_cache{c.m_active_cache},
+			m_cache_dictionary{std::move(c.m_cache_dictionary)}
+		{ c.m_active_cache = nullptr; }
+
 		Cache& operator=(const Cache&) = delete;
+		Cache& operator=(Cache&& c);
+
 		virtual ~Cache() {}
 
 		void remove_active();
