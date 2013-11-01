@@ -17,18 +17,30 @@
 	along with libhawk.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <utility>
 #include "Column.h"
 
 using namespace hawk;
 
 Column::Column(const boost::filesystem::path& path,
-	Type_factory::Type_product tp)
-	: m_path{path}
+	const Type_factory::Type_product& tp)
+	:
+	m_path{path},
+	m_handler{tp(path)}
+{}
+
+Column& Column::operator=(const Column& col)
 {
-	m_handler = tp();
+	m_path = col.m_path;
+	m_handler = col.m_handler;
+
+	return *this;
 }
 
-Column::~Column()
+Column& Column::operator=(Column&& col)
 {
-	delete m_handler;
+	m_path = std::move(col.m_path);
+	m_handler = std::move(col.m_handler);
+
+	return *this;
 }

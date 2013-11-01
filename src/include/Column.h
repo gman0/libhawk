@@ -20,7 +20,10 @@
 #ifndef HAWK_COLUMN_H
 #define HAWK_COLUMN_H
 
+#include <memory>
+#include <utility>
 #include "Handler.h"
+#include "handlers/dir.h"
 #include "TypeFactory.h"
 
 namespace hawk {
@@ -28,15 +31,28 @@ namespace hawk {
 	{
 	private:
 		boost::filesystem::path m_path;
-		Handler* m_handler;
+		std::shared_ptr<Handler> m_handler;
 
 	public:
 		Column(const boost::filesystem::path& path,
-			Type_factory::Type_product tp);
+			const Type_factory::Type_product& tp);
 		Column(boost::filesystem::path&& path,
-			Type_factory::Type_product tp);
+			const Type_factory::Type_product& tp);
 
-		~Column();
+		Column(const Column& col)
+			:
+			m_path{col.m_path},
+			m_handler{col.m_handler}
+		{}
+
+		Column(Column&& col)
+			:
+			m_path{std::move(col.m_path)},
+			m_handler{std::move(col.m_handler)}
+		{}
+
+		Column& operator=(const Column& col);
+		Column& operator=(Column&& col);
 	};
 }
 
