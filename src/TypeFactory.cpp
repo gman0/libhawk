@@ -22,7 +22,8 @@
 
 using namespace hawk;
 
-void Type_factory::register_type(size_t type, Type_factory::Type_product tp)
+void Type_factory::register_type(size_t type,
+	const Type_factory::Type_product& tp)
 {
 	m_types[type] = tp;
 }
