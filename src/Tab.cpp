@@ -25,17 +25,35 @@
 using namespace hawk;
 using namespace boost::filesystem;
 
-Tab::Tab(const boost::filesystem::path& pwd, unsigned columns,
+Tab::Tab(const path& pwd, unsigned columns,
 	Type_factory* tf)
 	:
 	m_pwd{pwd},
 	m_type_factory{tf}
 {
 	Type_factory::Type_product type_closure =
-		[&pwd]() -> Handler* { return new List_dir(pwd, "inode/directory"); };
+		[](const path& pwd){ return new List_dir{pwd}; };
 
 	for (unsigned i = 0; i < columns; i++)
 		m_columns.push_back({pwd, type_closure}); // TODO: supply proper paths
+}
+
+Tab& Tab::operator=(const Tab& t)
+{
+	m_pwd = t.m_pwd;
+	m_columns = t.m_columns;
+	m_type_factory = t.m_type_factory;
+
+	return *this;
+}
+
+Tab& Tab::operator=(Tab&& t)
+{
+	m_pwd = std::move(t.m_pwd);
+	m_columns = std::move(t.m_columns);
+	m_type_factory = t.m_type_factory;
+
+	return *this;
 }
 
 const path& Tab::get_pwd() const

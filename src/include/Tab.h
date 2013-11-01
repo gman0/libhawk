@@ -22,6 +22,7 @@
 
 #include <boost/filesystem/path.hpp>
 #include <vector>
+#include <utility>
 #include "Column.h"
 
 namespace hawk {
@@ -42,7 +43,24 @@ namespace hawk {
 	public:
 		Tab(const boost::filesystem::path& pwd, unsigned cols,
 			Type_factory* tf);
-		// Tab(boost::filesystem::path&& pwd, unsigned cols);
+		Tab(boost::filesystem::path&& pwd, unsigned cols);
+
+		Tab(const Tab& t)
+			:
+			m_pwd{t.m_pwd},
+			m_columns{t.m_columns},
+			m_type_factory{t.m_type_factory}
+		{}
+
+		Tab(Tab&& t)
+			:
+			m_pwd{std::move(t.m_pwd)},
+			m_columns{std::move(t.m_columns)},
+			m_type_factory{t.m_type_factory}
+		{}
+
+		Tab& operator=(const Tab& t);
+		Tab& operator=(Tab&& t);
 
 		const boost::filesystem::path& get_pwd() const;
 		void set_pwd(const boost::filesystem::path& pwd);
