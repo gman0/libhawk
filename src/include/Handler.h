@@ -22,6 +22,7 @@
 
 #include <boost/filesystem/path.hpp>
 #include <string>
+#include <utility>
 
 namespace hawk {
 	class Handler
@@ -35,6 +36,23 @@ namespace hawk {
 	public:
 		// type as in the mime type
 		Handler(const boost::filesystem::path& path, const std::string& type);
+
+		Handler(const boost::filesystem::path& path, size_t hash)
+			:
+			m_path{path},
+			m_type{hash}
+		{}
+
+		Handler(const Handler& h)
+			: m_path{h.m_path} {}
+
+		Handler(Handler&& h)
+			:
+			m_path{std::move(h.m_path)},
+			m_type{h.m_type}
+		{}
+
+		virtual ~Handler() {}
 
 		size_t get_type() const;
 		bool operator==(const Handler& h);
