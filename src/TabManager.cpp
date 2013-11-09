@@ -48,19 +48,19 @@ Tab& Tab_manager::get_tabref(int tab)
 Tab_manager::Tab_iterator& Tab_manager::add_tab()
 {
 	m_tabs.push_back({m_active_tab->get_pwd(), columns, m_type_factory});
-	return (m_active_tab = m_tabs.end()--);
+	return (m_active_tab = --m_tabs.end());
 }
 
 Tab_manager::Tab_iterator& Tab_manager::add_tab(const boost::filesystem::path& pwd)
 {
 	m_tabs.push_back({pwd, columns, m_type_factory});
-	return (m_active_tab = m_tabs.end()--);
+	return (m_active_tab = --m_tabs.end());
 }
 
 Tab_manager::Tab_iterator& Tab_manager::add_tab(boost::filesystem::path&& pwd)
 {
 	m_tabs.push_back({std::move(pwd), columns, m_type_factory});
-	return (m_active_tab = m_tabs.end()--);
+	return (m_active_tab = --m_tabs.end());
 }
 
 void Tab_manager::remove_tab(Tab_manager::Tab_iterator& tab)
