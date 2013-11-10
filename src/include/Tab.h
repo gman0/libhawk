@@ -52,6 +52,7 @@ namespace hawk {
 			m_type_factory{t.m_type_factory}
 		{}
 
+
 		Tab(Tab&& t)
 			:
 			m_pwd{std::move(t.m_pwd)},
@@ -64,6 +65,8 @@ namespace hawk {
 
 		const boost::filesystem::path& get_pwd() const;
 		void set_pwd(const boost::filesystem::path& pwd);
+
+		const std::vector<Column>& get_columns();
 	};
 }
 

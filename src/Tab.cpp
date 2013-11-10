@@ -65,3 +65,8 @@ void Tab::set_pwd(const path& pwd)
 {
 	m_pwd = pwd;
 }
+
+const std::vector<Column>& Tab::get_columns()
+{
+	return m_columns;
+}
