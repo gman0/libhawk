@@ -23,6 +23,7 @@
 #include <vector>
 #include <string>
 #include <ctime>
+#include <utility>
 #include <boost/filesystem.hpp>
 #include "Handler.h"
 #include "handlers/Cache.h"
@@ -58,7 +59,19 @@ namespace hawk {
 
 	public:
 		List_dir(const boost::filesystem::path& path);
-		const Dir_cache* read() { return m_active_cache; }
+		List_dir(const List_dir&) = delete;
+
+		List_dir(List_dir&& ld)
+			:
+			Handler{std::move(ld)},
+			m_cache{std::move(m_cache)},
+			m_cursor{std::move(m_cursor)},
+			m_active_cache{ld.m_active_cache}
+		{ ld.m_active_cache = nullptr; }
+
+		List_dir& operator=(List_dir&& ld);
+
+		const Dir_cache* read() const { return m_active_cache; }
 
 		// TODO: navigate, move_cursor etc...
 

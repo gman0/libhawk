@@ -45,6 +45,18 @@ List_dir::List_dir(const boost::filesystem::path& path)
 		m_cache.switch_cache(last_write_time(path), hash_value(path));
 }
 
+List_dir& List_dir::operator=(List_dir&& ld)
+{
+	const_cast<path&>(m_path) = ld.m_path;
+	m_type = ld.m_type;
+	m_cache = std::move(ld.m_cache);
+	m_cursor = std::move(ld.m_cursor);
+	m_active_cache = ld.m_active_cache;
+	ld.m_active_cache = nullptr;
+
+	return *this;
+}
+
 void List_dir::fill_cache(List_dir::Dir_cache* dc)
 {
 	Dir_vector& vec = dc->vec;
