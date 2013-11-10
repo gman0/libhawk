@@ -44,3 +44,8 @@ Column& Column::operator=(Column&& col)
 
 	return *this;
 }
+
+const Handler* Column::get_handler() const
+{
+	return m_handler.get();
+}

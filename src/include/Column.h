@@ -53,6 +53,8 @@ namespace hawk {
 
 		Column& operator=(const Column& col);
 		Column& operator=(Column&& col);
+
+		const Handler* get_handler() const;
 	};
 }
 
