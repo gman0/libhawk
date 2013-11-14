@@ -32,6 +32,10 @@ namespace hawk {
 		size_t m_type; // hash value of type
 
 	public:
+		Handler()
+			: m_path{}, m_type{}
+		{}
+
 		// type as in the mime type
 		Handler(const boost::filesystem::path& path, const std::string& type);
 
