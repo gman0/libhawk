@@ -37,9 +37,15 @@ List_dir::List_dir(const boost::filesystem::path& path)
 	Handler{path, get_handler_hash<List_dir>()},
 	m_cache{([this](List_dir::Dir_cache* dc){ fill_cache(dc); })}
 {
+	if (path.empty())
+	{
+		m_active_cache = nullptr;
+		return;
+	}
+
 	if (!is_directory(path))
-		throw std::runtime_error(
-				"Current path is not a directory");
+		throw std::runtime_error
+				{ std::string{"Path '"} + path.c_str() + "' is not a directory" };
 
 	m_active_cache =
 		m_cache.switch_cache(last_write_time(path), hash_value(path));
