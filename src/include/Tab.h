@@ -37,6 +37,7 @@ namespace hawk {
 		boost::filesystem::path m_pwd;
 
 		std::vector<Column> m_columns;
+		Column* m_active_column;
 
 		Type_factory* m_type_factory;
 
@@ -44,27 +45,24 @@ namespace hawk {
 		Tab(const boost::filesystem::path& pwd, unsigned cols,
 			Type_factory* tf);
 		Tab(boost::filesystem::path&& pwd, unsigned cols);
-
-		Tab(const Tab& t)
-			:
-			m_pwd{t.m_pwd},
-			m_columns{t.m_columns},
-			m_type_factory{t.m_type_factory}
-		{}
-
+		Tab(const Tab& t);
 
 		Tab(Tab&& t)
 			:
 			m_pwd{std::move(t.m_pwd)},
 			m_columns{std::move(t.m_columns)},
+			m_active_column{t.m_active_column},
 			m_type_factory{t.m_type_factory}
-		{}
+		{ t.m_active_column = nullptr; }
 
 		Tab& operator=(const Tab& t);
 		Tab& operator=(Tab&& t);
 
 		const boost::filesystem::path& get_pwd() const;
 		void set_pwd(const boost::filesystem::path& pwd);
+
+		void add_column();
+		void remove_column();
 
 		const std::vector<Column>& get_columns();
 	};
