@@ -18,6 +18,7 @@
 */
 
 #include <boost/filesystem.hpp>
+#include <algorithm>
 #include "Tab.h"
 #include "TypeFactory.h"
 #include "handlers/dir.h"
@@ -32,11 +33,29 @@ Tab::Tab(const path& pwd, unsigned columns,
 	m_type_factory{tf}
 {
 	Type_factory::Type_product type_closure =
-		[](const path& pwd){ return new List_dir{pwd}; };
+		[](const path& dir){ return new List_dir{dir}; };
+
+	path p = pwd;
 
 	for (unsigned i = 0; i < columns; i++)
-		m_columns.push_back({pwd, type_closure}); // TODO: supply proper paths
+	{
+		m_columns.push_back({p, type_closure});
+		p = p.parent_path();
+	}
+
+	std::reverse(m_columns.begin(), m_columns.end());
+	m_active_column = &(*(--m_columns.end()));
 }
+
+Tab::Tab(const Tab& t)
+	:
+	m_pwd{t.m_pwd},
+	m_columns{t.m_columns},
+	m_type_factory{t.m_type_factory}
+{
+	m_active_column = &(*(--m_columns.end()));
+}
+
 
 Tab& Tab::operator=(const Tab& t)
 {
