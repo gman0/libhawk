@@ -12,4 +12,4 @@ include_directories("include" ${Boost_INCLUDE_DIRS})
 
 file(GLOB_RECURSE srcs "./*.cpp")
 add_library(hawk SHARED ${srcs})
-target_link_libraries(hawk ${Boost_LIBRARIES})
+target_link_libraries(hawk ${Boost_LIBRARIES} magic)
