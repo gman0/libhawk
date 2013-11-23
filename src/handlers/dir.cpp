@@ -19,6 +19,7 @@
 
 #include <exception>
 #include <utility>
+#include <algorithm>
 
 #include <boost/functional/hash.hpp>
 // ^ this resolves an undefined reference to boost::hash_range<>
@@ -56,7 +57,6 @@ List_dir& List_dir::operator=(List_dir&& ld)
 	const_cast<path&>(m_path) = ld.m_path;
 	m_type = ld.m_type;
 	m_cache = std::move(ld.m_cache);
-	m_cursor = std::move(ld.m_cursor);
 	m_active_cache = ld.m_active_cache;
 	ld.m_active_cache = nullptr;
 
@@ -72,13 +72,37 @@ void List_dir::fill_cache(List_dir::Dir_cache* dc)
 	if (vec.size() > cache_threshold)
 		vec.resize(cache_threshold);
 
-	directory_iterator end;
-	for (directory_iterator dir_it{m_path}; dir_it != end; ++dir_it)
-	{
-		// const path& p = dir_it->path();
-		// vec.push_back({last_write_time(p), p, dir_it->status()});
-		vec.push_back(dir_it->path());
-	}
+	std::copy(directory_iterator {m_path}, directory_iterator {},
+				std::back_inserter(vec));
 
 	dc->cursor = vec.begin();
+}
+
+void List_dir::set_cursor(const List_dir::Dir_cursor& cursor)
+{
+	m_active_cache->cursor = cursor;
+}
+
+const List_dir::Dir_cursor& List_dir::get_cursor() const
+{
+	return m_active_cache->cursor;
+}
+
+void List_dir::change_directory(const path& dir)
+{
+	if (dir.empty())
+	{
+		m_active_cache = nullptr;
+		return;
+	}
+
+	if (!is_directory(dir))
+	{
+		throw std::runtime_error
+			{ std::string {"\""} + dir.c_str() + "\" is not a directory" };
+	}
+
+	const_cast<path&>(m_path) = dir;
+	m_active_cache =
+		m_cache.switch_cache(last_write_time(dir), hash_value(dir));
 }

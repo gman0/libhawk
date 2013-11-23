@@ -54,7 +54,6 @@ namespace hawk {
 
 	private:
 		Cache<size_t, Dir_cache> m_cache;
-		Dir_cursor m_cursor;
 		Dir_cache* m_active_cache;
 
 	public:
@@ -65,7 +64,6 @@ namespace hawk {
 			:
 			Handler{std::move(ld)},
 			m_cache{std::move(m_cache)},
-			m_cursor{std::move(m_cursor)},
 			m_active_cache{ld.m_active_cache}
 		{ ld.m_active_cache = nullptr; }
 
@@ -73,7 +71,9 @@ namespace hawk {
 
 		const Dir_cache* read() const { return m_active_cache; }
 
-		// TODO: navigate, move_cursor etc...
+		void set_cursor(const Dir_cursor& cursor);
+		const Dir_cursor& get_cursor() const;
+		void change_directory(const boost::filesystem::path& path);
 
 	private:
 		void fill_cache(Dir_cache* dc);
