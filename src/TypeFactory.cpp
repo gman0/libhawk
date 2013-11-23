@@ -17,10 +17,38 @@
 	along with libhawk.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <exception>
+#include <string>
 #include "TypeFactory.h"
 #include "Handler.h"
 
 using namespace hawk;
+using namespace boost::filesystem;
+
+#include <iostream>
+Type_factory::Magic_guard::Magic_guard()
+{
+	magic_cookie = magic_open(MAGIC_MIME_TYPE);
+	magic_load(magic_cookie, nullptr);
+}
+
+Type_factory::Magic_guard::~Magic_guard()
+{
+	magic_close(magic_cookie);
+	std::cout << "~Magic_guard()\n";
+}
+
+Type_factory::Type_factory()
+{
+	if (!m_magic_guard.magic_cookie)
+	{
+		throw std::runtime_error
+			{
+				std::string {"Cannot load magic database: "}
+				+ magic_error(m_magic_guard.magic_cookie)
+			};
+	}
+}
 
 void Type_factory::register_type(size_t type,
 	const Type_factory::Type_product& tp)
@@ -33,7 +61,22 @@ Type_factory::Type_product Type_factory::operator[](size_t type)
 	auto tp_iterator = m_types.find(type);
 
 	if (tp_iterator == m_types.end())
-		return Type_product{nullptr};
+		return Type_product {nullptr};
 
 	return tp_iterator->second;
+}
+
+Type_factory::Type_product Type_factory::operator[](const path& p)
+{
+	return operator[](get_hash_type(p));
+}
+
+const char* Type_factory::get_mime(const path& p)
+{
+	return magic_file(m_magic_guard.magic_cookie, p.c_str());
+}
+
+size_t Type_factory::get_hash_type(const path& p)
+{
+	return std::hash<std::string>()({get_mime(p)});
 }

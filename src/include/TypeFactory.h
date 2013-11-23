@@ -23,6 +23,7 @@
 #include <unordered_map>
 #include <functional>
 #include <boost/filesystem/path.hpp>
+#include <magic.h>
 
 namespace hawk {
 	class Handler;
@@ -36,12 +37,24 @@ namespace hawk {
 	private:
 		std::unordered_map<size_t, Type_product> m_types;
 
+		struct Magic_guard
+		{
+			magic_t magic_cookie;
+
+			Magic_guard();
+			~Magic_guard();
+		} m_magic_guard;
+
 	public:
-		Type_factory() {}
+		Type_factory();
 		Type_factory(const Type_factory&) = delete;
 
 		void register_type(size_t type, const Type_product& tp);
 		Type_product operator[](size_t type);
+		Type_product operator[](const boost::filesystem::path& p);
+
+		const char* get_mime(const boost::filesystem::path& p);
+		size_t get_hash_type(const boost::filesystem::path& p);
 	};
 }
 
