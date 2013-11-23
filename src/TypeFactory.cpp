@@ -25,7 +25,6 @@
 using namespace hawk;
 using namespace boost::filesystem;
 
-#include <iostream>
 Type_factory::Magic_guard::Magic_guard()
 {
 	magic_cookie = magic_open(MAGIC_MIME_TYPE);
@@ -35,7 +34,6 @@ Type_factory::Magic_guard::Magic_guard()
 Type_factory::Magic_guard::~Magic_guard()
 {
 	magic_close(magic_cookie);
-	std::cout << "~Magic_guard()\n";
 }
 
 Type_factory::Type_factory()
