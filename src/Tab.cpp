@@ -19,32 +19,44 @@
 
 #include <boost/filesystem.hpp>
 #include <algorithm>
+#include <exception>
 #include "Tab.h"
-#include "TypeFactory.h"
 #include "handlers/dir.h"
+#include "handlers/dir_hash_extern.h"
 
 using namespace hawk;
 using namespace boost::filesystem;
+
+static Type_factory::Type_product list_dir_closure =
+	[](const path& dir){ return new List_dir{dir}; };
+
 
 Tab::Tab(const path& pwd, unsigned columns,
 	Type_factory* tf)
 	:
 	m_pwd{pwd},
-	m_type_factory{tf}
+	m_columns{columns},
+	m_type_factory{tf},
+	m_has_preview{false}
 {
-	Type_factory::Type_product type_closure =
-		[](const path& dir){ return new List_dir{dir}; };
+	m_columns.reserve(columns + 1);
 
+	// build the columns
 	path p = pwd;
 
-	for (unsigned i = 0; i < columns; i++)
+	for (int i = columns - 1; i >= 0; i--)
 	{
-		m_columns.push_back({p, type_closure});
+		add_column(p, list_dir_closure, i);
 		p = p.parent_path();
 	}
 
-	std::reverse(m_columns.begin(), m_columns.end());
-	m_active_column = &(*(--m_columns.end()));
+	activate_last_column();
+
+	// cursor check
+	List_dir* active_handler =
+		static_cast<List_dir*>(m_active_column->get_handler());
+
+	set_cursor(active_handler->get_cursor());
 }
 
 Tab::Tab(const Tab& t)
@@ -55,7 +67,6 @@ Tab::Tab(const Tab& t)
 {
 	m_active_column = &(*(--m_columns.end()));
 }
-
 
 Tab& Tab::operator=(const Tab& t)
 {
@@ -83,9 +94,94 @@ const path& Tab::get_pwd() const
 void Tab::set_pwd(const path& pwd)
 {
 	m_pwd = pwd;
+	update_paths(pwd);
 }
 
-const std::vector<Column>& Tab::get_columns()
+std::vector<Column>& Tab::get_columns()
 {
 	return m_columns;
+}
+
+const std::vector<Column>& Tab::get_columns() const
+{
+	return m_columns;
+}
+
+void Tab::set_cursor(const List_dir::Dir_cursor& cursor)
+{
+	// remove current preview column (if any)
+	if (m_has_preview)
+	{
+		m_columns.erase(--m_columns.end());
+		m_has_preview = false;
+	}
+
+
+	// reset the active column
+	activate_last_column();
+
+
+	// set the cursor in the active column
+
+	Handler* handler = m_active_column->get_handler();
+	if (handler->get_type() != get_handler_hash<List_dir>())
+	{
+		throw std::logic_error
+			{ "Attempt to move List_dir cursor outside of List_dir" };
+	}
+
+	static_cast<List_dir*>(handler)->set_cursor(cursor);
+
+
+	// add new preview column if we need to
+
+	Type_factory::Type_product closure =
+		(*m_type_factory)[*cursor];
+
+	if (closure)
+	{
+		add_column(*cursor, closure);
+		m_has_preview = true;
+	}
+}
+
+void Tab::update_paths(const path& pwd)
+{
+	size_t ncols = m_columns.size();
+	ncols -= (m_has_preview) ? 0 : 1;
+
+	static path p = pwd;
+
+	for (int i = ncols - 1; i >= 0; i--)
+	{
+		static_cast<List_dir*>
+			(m_columns[i].get_handler())->change_directory(p);
+		p = p.parent_path();
+	}
+}
+
+void Tab::remove_column()
+{
+	// let's leave at least 1 column
+	if (m_columns.size() == 1)
+		return;
+
+	m_columns.erase(m_columns.begin());
+}
+
+void Tab::add_column(const path& pwd)
+{
+	add_column(pwd, list_dir_closure);
+}
+
+void Tab::add_column(const path& pwd,
+	const Type_factory::Type_product& closure)
+{
+	m_columns.push_back({pwd, closure});
+}
+
+void Tab::add_column(const path& pwd,
+	const Type_factory::Type_product& closure, unsigned inplace_col)
+{
+	m_columns[inplace_col] = {pwd, closure};
 }

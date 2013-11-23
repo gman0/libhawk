@@ -24,6 +24,7 @@
 #include <vector>
 #include <utility>
 #include "Column.h"
+#include "TypeFactory.h"
 
 namespace hawk {
 	class Type_factory;
@@ -41,10 +42,16 @@ namespace hawk {
 
 		Type_factory* m_type_factory;
 
+		// This one's used to check whether we have
+		// a preview column. Also, we can make the assumption
+		// that only the last column can be a preview and that
+		// there can be only one preview.
+		bool m_has_preview;
+
 	public:
-		Tab(const boost::filesystem::path& pwd, unsigned cols,
+		Tab(const boost::filesystem::path& pwd, unsigned ncols,
 			Type_factory* tf);
-		Tab(boost::filesystem::path&& pwd, unsigned cols);
+		Tab(boost::filesystem::path&& pwd, unsigned ncols);
 		Tab(const Tab& t);
 
 		Tab(Tab&& t)
@@ -61,10 +68,27 @@ namespace hawk {
 		const boost::filesystem::path& get_pwd() const;
 		void set_pwd(const boost::filesystem::path& pwd);
 
-		void add_column();
+		void add_column(const boost::filesystem::path& pwd);
 		void remove_column();
 
-		const std::vector<Column>& get_columns();
+		std::vector<Column>& get_columns();
+		const std::vector<Column>& get_columns() const;
+
+		void set_cursor(const List_dir::Dir_cursor& cursor);
+
+	private:
+		void update_paths(const boost::filesystem::path& pwd);
+
+		void add_column(const boost::filesystem::path& pwd,
+			const Type_factory::Type_product& closure);
+		void add_column(const boost::filesystem::path& pwd,
+			const Type_factory::Type_product& closure,
+			unsigned inplace_col);
+
+		inline void activate_last_column()
+		{
+			m_active_column = &(*(--m_columns.end()));
+		}
 	};
 }
 
