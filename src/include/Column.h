@@ -34,6 +34,7 @@ namespace hawk {
 		std::shared_ptr<Handler> m_handler;
 
 	public:
+		Column() {}
 		Column(const boost::filesystem::path& path,
 			const Type_factory::Type_product& tp);
 		Column(boost::filesystem::path&& path,
@@ -54,6 +55,7 @@ namespace hawk {
 		Column& operator=(const Column& col);
 		Column& operator=(Column&& col);
 
+		Handler* get_handler();
 		const Handler* get_handler() const;
 	};
 }

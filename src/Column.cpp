@@ -45,6 +45,11 @@ Column& Column::operator=(Column&& col)
 	return *this;
 }
 
+Handler* Column::get_handler()
+{
+	return m_handler.get();
+}
+
 const Handler* Column::get_handler() const
 {
 	return m_handler.get();
