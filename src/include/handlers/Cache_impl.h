@@ -58,7 +58,7 @@ namespace hawk {
 		}
 		else
 		{
-			Cache_dictionary_entry dir_ent = m_cache_dictionary[k];
+			Cache_dictionary_entry& dir_ent = m_cache_dictionary[k];
 			update_cache(timestamp, dir_ent);
 
 			return (m_active_cache = &dir_ent.second);
