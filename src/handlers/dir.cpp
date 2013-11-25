@@ -54,7 +54,7 @@ List_dir::List_dir(const boost::filesystem::path& path)
 
 List_dir& List_dir::operator=(List_dir&& ld)
 {
-	const_cast<path&>(m_path) = ld.m_path;
+	m_path = ld.m_path;
 	m_type = ld.m_type;
 	m_cache = std::move(ld.m_cache);
 	m_active_cache = ld.m_active_cache;
@@ -72,7 +72,7 @@ void List_dir::fill_cache(List_dir::Dir_cache* dc)
 	if (vec.size() > cache_threshold)
 		vec.resize(cache_threshold);
 
-	std::copy(directory_iterator {m_path}, directory_iterator {},
+	std::copy(directory_iterator {*m_path}, directory_iterator {},
 				std::back_inserter(vec));
 
 	dc->cursor = vec.begin();
@@ -88,8 +88,10 @@ const List_dir::Dir_cursor& List_dir::get_cursor() const
 	return m_active_cache->cursor;
 }
 
-void List_dir::change_directory(const path& dir)
+void List_dir::set_path(const path& dir)
 {
+	Handler::set_path(dir);
+
 	if (dir.empty())
 	{
 		m_active_cache = nullptr;
@@ -102,7 +104,7 @@ void List_dir::change_directory(const path& dir)
 			{ std::string {"\""} + dir.c_str() + "\" is not a directory" };
 	}
 
-	const_cast<path&>(m_path) = dir;
+	m_path = &dir;
 	m_active_cache =
 		m_cache.switch_cache(last_write_time(dir), hash_value(dir));
 }

@@ -73,7 +73,7 @@ namespace hawk {
 
 		void set_cursor(const Dir_cursor& cursor);
 		const Dir_cursor& get_cursor() const;
-		void change_directory(const boost::filesystem::path& path);
+		virtual void set_path(const boost::filesystem::path& path);
 
 	private:
 		void fill_cache(Dir_cache* dc);
