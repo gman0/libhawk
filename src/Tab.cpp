@@ -44,26 +44,23 @@ Tab::Tab(const path& pwd, unsigned columns,
 	// build the columns
 	path p = pwd;
 
+	add_column(p, list_dir_closure, --columns);
 	for (int i = columns - 1; i >= 0; i--)
 	{
-		add_column(p, list_dir_closure, i);
 		p = p.parent_path();
+		add_column(p, list_dir_closure, i);
 	}
 
 	activate_last_column();
-
-	// cursor check
-	List_dir* active_handler =
-		static_cast<List_dir*>(m_active_column->get_handler());
-
-	set_cursor(active_handler->get_cursor());
+	update_cursor();
 }
 
 Tab::Tab(const Tab& t)
 	:
 	m_pwd{t.m_pwd},
 	m_columns{t.m_columns},
-	m_type_factory{t.m_type_factory}
+	m_type_factory{t.m_type_factory},
+	m_has_preview{t.m_has_preview}
 {
 	m_active_column = &(*(--m_columns.end()));
 }
@@ -73,6 +70,7 @@ Tab& Tab::operator=(const Tab& t)
 	m_pwd = t.m_pwd;
 	m_columns = t.m_columns;
 	m_type_factory = t.m_type_factory;
+	m_has_preview = t.m_has_preview;
 
 	return *this;
 }
@@ -82,6 +80,7 @@ Tab& Tab::operator=(Tab&& t)
 	m_pwd = std::move(t.m_pwd);
 	m_columns = std::move(t.m_columns);
 	m_type_factory = t.m_type_factory;
+	m_has_preview = t.m_has_preview;
 
 	return *this;
 }
@@ -95,6 +94,7 @@ void Tab::set_pwd(const path& pwd)
 {
 	m_pwd = pwd;
 	update_paths(pwd);
+	update_cursor();
 }
 
 std::vector<Column>& Tab::get_columns()
@@ -145,18 +145,16 @@ void Tab::set_cursor(const List_dir::Dir_cursor& cursor)
 	}
 }
 
-void Tab::update_paths(const path& pwd)
+void Tab::update_paths(path pwd)
 {
 	size_t ncols = m_columns.size();
-	ncols -= (m_has_preview) ? 0 : 1;
+	ncols -= (m_has_preview) ? 1 : 0;
 
-	static path p = pwd;
-
+	m_columns[--ncols].set_path(pwd);
 	for (int i = ncols - 1; i >= 0; i--)
 	{
-		static_cast<List_dir*>
-			(m_columns[i].get_handler())->change_directory(p);
-		p = p.parent_path();
+		pwd = pwd.parent_path();
+		m_columns[i].set_path(pwd);
 	}
 }
 
@@ -184,4 +182,12 @@ void Tab::add_column(const path& pwd,
 	const Type_factory::Type_product& closure, unsigned inplace_col)
 {
 	m_columns[inplace_col] = {pwd, closure};
+}
+
+void Tab::update_cursor()
+{
+	List_dir* active_handler =
+		static_cast<List_dir*>(m_active_column->get_handler());
+
+	set_cursor(active_handler->get_cursor());
 }

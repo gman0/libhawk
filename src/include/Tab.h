@@ -59,7 +59,8 @@ namespace hawk {
 			m_pwd{std::move(t.m_pwd)},
 			m_columns{std::move(t.m_columns)},
 			m_active_column{t.m_active_column},
-			m_type_factory{t.m_type_factory}
+			m_type_factory{t.m_type_factory},
+			m_has_preview{t.m_has_preview}
 		{ t.m_active_column = nullptr; }
 
 		Tab& operator=(const Tab& t);
@@ -77,7 +78,7 @@ namespace hawk {
 		void set_cursor(const List_dir::Dir_cursor& cursor);
 
 	private:
-		void update_paths(const boost::filesystem::path& pwd);
+		void update_paths(boost::filesystem::path pwd);
 
 		void add_column(const boost::filesystem::path& pwd,
 			const Type_factory::Type_product& closure);
@@ -89,6 +90,8 @@ namespace hawk {
 		{
 			m_active_column = &(*(--m_columns.end()));
 		}
+
+		void update_cursor();
 	};
 }
 
