@@ -57,6 +57,10 @@ namespace hawk {
 
 		Handler* get_handler();
 		const Handler* get_handler() const;
+
+		const boost::filesystem::path& get_path() const;
+		void set_path(const boost::filesystem::path& path);
+		void set_path(boost::filesystem::path&& path);
 	};
 }
 

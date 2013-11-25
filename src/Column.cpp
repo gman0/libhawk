@@ -21,8 +21,9 @@
 #include "Column.h"
 
 using namespace hawk;
+using namespace boost::filesystem;
 
-Column::Column(const boost::filesystem::path& path,
+Column::Column(const path& path,
 	const Type_factory::Type_product& tp)
 	:
 	m_path{path},
@@ -53,4 +54,21 @@ Handler* Column::get_handler()
 const Handler* Column::get_handler() const
 {
 	return m_handler.get();
+}
+
+const path& Column::get_path() const
+{
+	return m_path;
+}
+
+void Column::set_path(const path& p)
+{
+	m_path = p;
+	m_handler->set_path(m_path);
+}
+
+void Column::set_path(path&& p)
+{
+	m_path = std::move(p);
+	m_handler->set_path(m_path);
 }
