@@ -26,7 +26,7 @@ using namespace boost::filesystem;
 
 Handler::Handler(const path& p, const string& type)
 	:
-	m_path{p}
+	m_path{&p}
 {
 	m_type = hash<string>()(type);
 }
@@ -44,4 +44,9 @@ bool Handler::operator==(const Handler& h)
 bool Handler::operator!=(const Handler& h)
 {
 	return (m_type != h.m_type);
+}
+
+void Handler::set_path(const path& p)
+{
+	m_path = &p;
 }

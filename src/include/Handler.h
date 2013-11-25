@@ -28,7 +28,7 @@ namespace hawk {
 	class Handler
 	{
 	protected:
-		const boost::filesystem::path& m_path;
+		const boost::filesystem::path* m_path;
 		size_t m_type; // hash value of type
 
 	public:
@@ -41,12 +41,13 @@ namespace hawk {
 
 		Handler(const boost::filesystem::path& path, size_t hash)
 			:
-			m_path{path},
+			m_path{&path},
 			m_type{hash}
 		{}
 
 		Handler(const Handler& h)
-			: m_path{h.m_path} {}
+			: m_path(h.m_path)
+		{}
 
 		Handler(Handler&& h)
 			:
@@ -60,6 +61,8 @@ namespace hawk {
 		size_t get_type() const;
 		bool operator==(const Handler& h);
 		bool operator!=(const Handler& h);
+
+		virtual void set_path(const boost::filesystem::path& p);
 	};
 }
 
