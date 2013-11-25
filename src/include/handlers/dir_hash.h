@@ -24,13 +24,13 @@
 #include "handlers/dir.h"
 #include "handlers/hash.h"
 
+static std::string type { "inode/directory" };
+static size_t hash = std::hash<std::string>()(type);
+
 namespace hawk {
 	template <>
 	size_t get_handler_hash<List_dir>()
 	{
-		static std::string type {"inode/direcotry"};
-		static size_t hash = std::hash<std::string>()(type);
-
 		return hash;
 	}
 }
