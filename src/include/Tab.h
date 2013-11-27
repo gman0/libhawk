@@ -88,7 +88,7 @@ namespace hawk {
 
 		inline void activate_last_column()
 		{
-			m_active_column = &(*(--m_columns.end()));
+			m_active_column = &(m_columns.back());
 		}
 
 		void update_cursor();
