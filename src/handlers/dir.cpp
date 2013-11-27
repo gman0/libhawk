@@ -104,7 +104,6 @@ void List_dir::set_path(const path& dir)
 			{ std::string {"\""} + dir.c_str() + "\" is not a directory" };
 	}
 
-	m_path = &dir;
 	m_active_cache =
 		m_cache.switch_cache(last_write_time(dir), hash_value(dir));
 }
