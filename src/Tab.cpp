@@ -29,6 +29,21 @@ using namespace boost::filesystem;
 
 static Type_factory::Type_product list_dir_closure =
 	[](const path& dir){ return new List_dir{dir}; };
+static std::vector<path> parent_paths;
+
+static void generate_parent_paths(std::vector<path>& v,
+	path& p, int n)
+{
+	v.clear(); // we need to start with a clean vector
+	v.push_back(p);
+
+	--n;
+	for (; n >= 0; --n)
+	{
+		p = p.parent_path();
+		v.push_back(p);
+	}
+}
 
 
 Tab::Tab(const path& pwd, unsigned columns,
@@ -42,14 +57,17 @@ Tab::Tab(const path& pwd, unsigned columns,
 	m_columns.reserve(columns + 1);
 
 	// build the columns
-	path p = pwd;
+	Type_factory::Type_product closure =
+		(*m_type_factory)[get_handler_hash<List_dir>()];
 
-	add_column(p, list_dir_closure, --columns);
-	for (int i = columns - 1; i >= 0; i--)
-	{
-		p = p.parent_path();
-		add_column(p, list_dir_closure, i);
-	}
+	if (closure)
+		list_dir_closure = closure;
+
+	path p = pwd;
+	generate_parent_paths(parent_paths, p, --columns);
+
+	std::for_each(parent_paths.rbegin(), parent_paths.rend(),
+		[this](const path& pwd){ add_column(pwd, list_dir_closure); });
 
 	activate_last_column();
 	update_cursor();
