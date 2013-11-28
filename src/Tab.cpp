@@ -67,7 +67,7 @@ Tab::Tab(const path& pwd, unsigned columns,
 	generate_parent_paths(parent_paths, p, --columns);
 
 	std::for_each(parent_paths.rbegin(), parent_paths.rend(),
-		[this](const path& pwd){ add_column(pwd, list_dir_closure); });
+		[this](path& pwd){ add_column(std::move(pwd), list_dir_closure); });
 
 	activate_last_column();
 	update_cursor();
@@ -194,6 +194,12 @@ void Tab::add_column(const path& pwd,
 	const Type_factory::Type_product& closure)
 {
 	m_columns.push_back({pwd, closure});
+}
+
+void Tab::add_column(path&& pwd,
+	const Type_factory::Type_product& closure)
+{
+	m_columns.push_back({std::move(pwd), closure});
 }
 
 void Tab::add_column(const path& pwd,

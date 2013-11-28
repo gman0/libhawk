@@ -82,6 +82,8 @@ namespace hawk {
 
 		void add_column(const boost::filesystem::path& pwd,
 			const Type_factory::Type_product& closure);
+		void add_column(boost::filesystem::path&& pwd,
+			const Type_factory::Type_product& closure);
 		void add_column(const boost::filesystem::path& pwd,
 			const Type_factory::Type_product& closure,
 			unsigned inplace_col);
