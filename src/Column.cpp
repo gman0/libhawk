@@ -30,6 +30,12 @@ Column::Column(const path& path,
 	m_handler{tp(path)}
 {}
 
+Column::Column(path&& p, const Type_factory::Type_product& tp)
+	:
+	m_path{std::move(p)},
+	m_handler{tp(m_path)}
+{}
+
 Column& Column::operator=(const Column& col)
 {
 	m_path = col.m_path;
