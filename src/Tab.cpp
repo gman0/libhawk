@@ -27,8 +27,6 @@
 using namespace hawk;
 using namespace boost::filesystem;
 
-static Type_factory::Type_product list_dir_closure =
-	[](const path& dir){ return new List_dir{dir}; };
 static std::vector<path> parent_paths;
 
 static void generate_parent_paths(std::vector<path>& v,
@@ -46,30 +44,28 @@ static void generate_parent_paths(std::vector<path>& v,
 }
 
 
-Tab::Tab(const path& pwd, unsigned columns,
-	Type_factory* tf)
+Tab::Tab(const path& pwd, unsigned ncols,
+	Type_factory* tf, const Type_factory::Type_product& list_dir_closure)
 	:
 	m_pwd{pwd},
 	m_type_factory{tf},
+	m_list_dir_closure{list_dir_closure},
 	m_has_preview{false}
 {
-	m_columns.reserve(columns + 1);
+	m_columns.reserve(ncols + 1);
+	build_columns(ncols);
+}
 
-	// build the columns
-	Type_factory::Type_product closure =
-		(*m_type_factory)[get_handler_hash<List_dir>()];
-
-	if (closure)
-		list_dir_closure = closure;
-
-	path p = pwd;
-	generate_parent_paths(parent_paths, p, --columns);
-
-	std::for_each(parent_paths.rbegin(), parent_paths.rend(),
-		[this](path& pwd){ add_column(std::move(pwd), list_dir_closure); });
-
-	activate_last_column();
-	update_cursor();
+Tab::Tab(path&& pwd, unsigned ncols,
+	Type_factory* tf, const Type_factory::Type_product& list_dir_closure)
+	:
+	m_pwd{std::move(pwd)},
+	m_type_factory{tf},
+	m_list_dir_closure{list_dir_closure},
+	m_has_preview{false}
+{
+	m_columns.reserve(ncols + 1);
+	build_columns(ncols);
 }
 
 Tab::Tab(const Tab& t)
@@ -77,6 +73,7 @@ Tab::Tab(const Tab& t)
 	m_pwd{t.m_pwd},
 	m_columns{t.m_columns},
 	m_type_factory{t.m_type_factory},
+	m_list_dir_closure{t.m_list_dir_closure},
 	m_has_preview{t.m_has_preview}
 {
 	m_active_column = &(m_columns.back());
@@ -87,6 +84,7 @@ Tab& Tab::operator=(const Tab& t)
 	m_pwd = t.m_pwd;
 	m_columns = t.m_columns;
 	m_type_factory = t.m_type_factory;
+	m_list_dir_closure = t.m_list_dir_closure;
 	m_has_preview = t.m_has_preview;
 
 	return *this;
@@ -97,6 +95,7 @@ Tab& Tab::operator=(Tab&& t)
 	m_pwd = std::move(t.m_pwd);
 	m_columns = std::move(t.m_columns);
 	m_type_factory = t.m_type_factory;
+	m_list_dir_closure = std::move(t.m_list_dir_closure);
 	m_has_preview = t.m_has_preview;
 
 	return *this;
@@ -162,6 +161,18 @@ void Tab::set_cursor(const List_dir::Dir_cursor& cursor)
 	}
 }
 
+void Tab::build_columns(unsigned ncols)
+{
+	path p = m_pwd;
+	generate_parent_paths(parent_paths, p, --ncols);
+
+	std::for_each(parent_paths.rbegin(), parent_paths.rend(),
+		[this](path& pwd){ add_column(std::move(pwd), m_list_dir_closure); });
+
+	activate_last_column();
+	update_cursor();
+}
+
 void Tab::update_paths(path pwd)
 {
 	size_t ncols = m_columns.size();
@@ -186,7 +197,7 @@ void Tab::remove_column()
 
 void Tab::add_column(const path& pwd)
 {
-	add_column(pwd, list_dir_closure);
+	add_column(pwd, m_list_dir_closure);
 }
 
 void Tab::add_column(const path& pwd,

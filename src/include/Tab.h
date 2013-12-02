@@ -41,6 +41,7 @@ namespace hawk {
 		Column* m_active_column;
 
 		Type_factory* m_type_factory;
+		Type_factory::Type_product m_list_dir_closure;
 
 		// This one's used to check whether we have
 		// a preview column. Also, we can make the assumption
@@ -49,9 +50,14 @@ namespace hawk {
 		bool m_has_preview;
 
 	public:
-		Tab(const boost::filesystem::path& pwd, unsigned ncols,
-			Type_factory* tf);
-		Tab(boost::filesystem::path&& pwd, unsigned ncols);
+		Tab(const boost::filesystem::path& pwd,
+			unsigned ncols,
+			Type_factory* tf,
+			const Type_factory::Type_product& list_dir_closure);
+		Tab(boost::filesystem::path&& pwd,
+			unsigned ncols,
+			Type_factory* tf,
+			const Type_factory::Type_product& list_dir_closure);
 		Tab(const Tab& t);
 
 		Tab(Tab&& t)
@@ -78,6 +84,7 @@ namespace hawk {
 		void set_cursor(const List_dir::Dir_cursor& cursor);
 
 	private:
+		void build_columns(unsigned ncols);
 		void update_paths(boost::filesystem::path pwd);
 
 		void add_column(const boost::filesystem::path& pwd,
