@@ -35,13 +35,12 @@ namespace hawk {
 		Tab_iterator m_active_tab;
 
 		Type_factory* m_type_factory;
+		Type_factory::Type_product m_list_dir_closure;
 
 	public:
-		Tab_manager(Type_factory* tf)
-			: m_active_tab{}, m_type_factory{tf}
-		{}
-
-		Tab_manager(const Tab_manager& tm) = delete;
+		Tab_manager(Type_factory* tf);
+		Tab_manager(const Tab_manager&) = delete;
+		Tab_manager& operator=(const Tab_manager&) = delete;
 
 		Tab_iterator& get_active_tab();
 		void set_active_tab(Tab_iterator& tab);
