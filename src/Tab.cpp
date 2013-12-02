@@ -50,7 +50,6 @@ Tab::Tab(const path& pwd, unsigned columns,
 	Type_factory* tf)
 	:
 	m_pwd{pwd},
-	m_columns{columns},
 	m_type_factory{tf},
 	m_has_preview{false}
 {
@@ -80,7 +79,7 @@ Tab::Tab(const Tab& t)
 	m_type_factory{t.m_type_factory},
 	m_has_preview{t.m_has_preview}
 {
-	m_active_column = &(*(--m_columns.end()));
+	m_active_column = &(m_columns.back());
 }
 
 Tab& Tab::operator=(const Tab& t)
