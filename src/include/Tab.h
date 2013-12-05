@@ -81,6 +81,10 @@ namespace hawk {
 		std::vector<Column>& get_columns();
 		const std::vector<Column>& get_columns() const;
 
+		Column* get_active_column() { return m_active_column; }
+		const Column* get_active_column() const { return m_active_column; }
+		size_t get_active_column_num();
+
 		void set_cursor(const List_dir::Dir_cursor& cursor);
 
 	private:

@@ -123,6 +123,12 @@ const std::vector<Column>& Tab::get_columns() const
 	return m_columns;
 }
 
+size_t Tab::get_active_column_num()
+{
+	size_t ncols = m_columns.size();
+	return (m_has_preview ? (ncols - 2) : --ncols);
+}
+
 void Tab::set_cursor(const List_dir::Dir_cursor& cursor)
 {
 	// remove current preview column (if any)
