@@ -24,7 +24,6 @@
 #include "Tab.h"
 
 namespace hawk {
-
 	class Tab_manager
 	{
 	public:
@@ -37,8 +36,11 @@ namespace hawk {
 		Type_factory* m_type_factory;
 		Type_factory::Type_product m_list_dir_closure;
 
+		// default number of columns to create
+		unsigned m_ncols;
+
 	public:
-		Tab_manager(Type_factory* tf);
+		Tab_manager(Type_factory* tf, unsigned ncols);
 		Tab_manager(const Tab_manager&) = delete;
 		Tab_manager& operator=(const Tab_manager&) = delete;
 
