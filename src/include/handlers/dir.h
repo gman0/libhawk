@@ -70,6 +70,7 @@ namespace hawk {
 		List_dir& operator=(List_dir&& ld);
 
 		const Dir_cache* read() const { return m_active_cache; }
+		Dir_cache* read() { return m_active_cache; }
 
 		void set_cursor(const Dir_cursor& cursor);
 		const Dir_cursor& get_cursor() const;
