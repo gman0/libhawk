@@ -129,6 +129,13 @@ size_t Tab::get_active_column_num()
 	return (m_has_preview ? (ncols - 2) : --ncols);
 }
 
+List_dir::Dir_cursor Tab::get_begin_cursor() const
+{
+	List_dir* ld =
+		static_cast<List_dir*>(m_active_column->get_handler());
+	return ld->read()->vec.begin();
+}
+
 void Tab::set_cursor(const List_dir::Dir_cursor& cursor)
 {
 	// remove current preview column (if any)

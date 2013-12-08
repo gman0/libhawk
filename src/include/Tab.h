@@ -85,6 +85,7 @@ namespace hawk {
 		const Column* get_active_column() const { return m_active_column; }
 		size_t get_active_column_num();
 
+		List_dir::Dir_cursor get_begin_cursor() const;
 		void set_cursor(const List_dir::Dir_cursor& cursor);
 
 	private:
