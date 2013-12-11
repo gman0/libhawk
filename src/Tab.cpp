@@ -19,10 +19,7 @@
 
 #include <boost/filesystem.hpp>
 #include <algorithm>
-#include <exception>
 #include "Tab.h"
-#include "handlers/dir.h"
-#include "handlers/dir_hash_extern.h"
 
 using namespace hawk;
 using namespace boost::filesystem;
@@ -110,7 +107,8 @@ void Tab::set_pwd(const path& pwd)
 {
 	m_pwd = pwd;
 	update_paths(pwd);
-	update_cursor();
+	update_active_cursor();
+	update_inactive_cursors();
 }
 
 std::vector<Column>& Tab::get_columns()
@@ -123,7 +121,7 @@ const std::vector<Column>& Tab::get_columns() const
 	return m_columns;
 }
 
-size_t Tab::get_active_column_num()
+size_t Tab::get_current_ncols()
 {
 	size_t ncols = m_columns.size();
 	return (m_has_preview ? (ncols - 2) : --ncols);
@@ -145,22 +143,11 @@ void Tab::set_cursor(const List_dir::Dir_cursor& cursor)
 		m_has_preview = false;
 	}
 
-
 	// reset the active column
 	activate_last_column();
 
-
 	// set the cursor in the active column
-
-	Handler* handler = m_active_column->get_handler();
-	if (handler->get_type() != get_handler_hash<List_dir>())
-	{
-		throw std::logic_error
-			{ "Attempt to move List_dir cursor outside of List_dir" };
-	}
-
-	static_cast<List_dir*>(handler)->set_cursor(cursor);
-
+	get_list_dir_handler(m_active_column->get_handler())->set_cursor(cursor);
 
 	// add new preview column if we need to
 
@@ -180,18 +167,20 @@ void Tab::build_columns(unsigned ncols)
 	generate_parent_paths(parent_paths, p, --ncols);
 
 	std::for_each(parent_paths.rbegin(), parent_paths.rend(),
-		[this](path& pwd){ add_column(std::move(pwd), m_list_dir_closure); });
+		[this](path& pwd) { add_column(std::move(pwd), m_list_dir_closure); });
+		// we can discard parent_paths' by moving them as we don't need
+		// them anymore
 
+	update_inactive_cursors();
 	activate_last_column();
-	update_cursor();
+	update_active_cursor();
 }
 
 void Tab::update_paths(path pwd)
 {
-	size_t ncols = m_columns.size();
-	ncols -= (m_has_preview) ? 1 : 0;
+	size_t ncols = get_current_ncols();
 
-	m_columns[--ncols].set_path(pwd);
+	m_columns[ncols].set_path(pwd);
 	for (int i = ncols - 1; i >= 0; i--)
 	{
 		pwd = pwd.parent_path();
@@ -231,10 +220,26 @@ void Tab::add_column(const path& pwd,
 	m_columns[inplace_col] = {pwd, closure};
 }
 
-void Tab::update_cursor()
+void Tab::update_active_cursor()
 {
 	List_dir* active_handler =
 		static_cast<List_dir*>(m_active_column->get_handler());
 
 	set_cursor(active_handler->get_cursor());
+}
+
+void Tab::update_inactive_cursors()
+{
+	// we don't want the preview nor the active List_dir
+	size_t ncols = get_current_ncols();
+
+	auto end_col_it = m_columns.begin() + ncols;
+	for (auto col_it = m_columns.begin(); col_it != end_col_it;
+		 ++col_it)
+	{
+		List_dir* ld = get_list_dir_handler(col_it->get_handler());
+		const path& next_path = (col_it + 1)->get_path();
+
+		ld->set_cursor(next_path);
+	}
 }

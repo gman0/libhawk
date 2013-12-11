@@ -23,8 +23,11 @@
 #include <boost/filesystem/path.hpp>
 #include <vector>
 #include <utility>
+#include <exception>
 #include "Column.h"
 #include "TypeFactory.h"
+#include "handlers/dir.h"
+#include "handlers/dir_hash_extern.h"
 
 namespace hawk {
 	class Type_factory;
@@ -83,7 +86,7 @@ namespace hawk {
 
 		Column* get_active_column() { return m_active_column; }
 		const Column* get_active_column() const { return m_active_column; }
-		size_t get_active_column_num();
+		size_t get_current_ncols(); // don't confuse this with the size of column vector
 
 		List_dir::Dir_cursor get_begin_cursor() const;
 		void set_cursor(const List_dir::Dir_cursor& cursor);
@@ -105,7 +108,19 @@ namespace hawk {
 			m_active_column = &(m_columns.back());
 		}
 
-		void update_cursor();
+		inline List_dir* get_list_dir_handler(Handler* handler)
+		{
+			if (handler->get_type() != get_handler_hash<List_dir>())
+			{
+				throw std::logic_error
+					{ "Attempt to cast a non-List_dir handler to List_dir" };
+			}
+
+			return static_cast<List_dir*>(handler);
+		}
+
+		void update_active_cursor();
+		void update_inactive_cursors();
 	};
 }
 
