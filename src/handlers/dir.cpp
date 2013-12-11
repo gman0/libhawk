@@ -33,6 +33,8 @@ using namespace boost::filesystem;
 
 constexpr int cache_threshold = 1024;
 
+#include <iostream>
+using namespace std;
 List_dir::List_dir(const boost::filesystem::path& path)
 	:
 	Handler{path, get_handler_hash<List_dir>()},
@@ -75,12 +77,39 @@ void List_dir::fill_cache(List_dir::Dir_cache* dc)
 	std::copy(directory_iterator {*m_path}, directory_iterator {},
 				std::back_inserter(vec));
 
+	// set_cursor(dc, *m_path);
+	// init the cursor
 	dc->cursor = vec.begin();
 }
 
 void List_dir::set_cursor(const List_dir::Dir_cursor& cursor)
 {
 	m_active_cache->cursor = cursor;
+}
+
+void List_dir::set_cursor(const path& cur)
+{
+	set_cursor(m_active_cache, cur);
+}
+
+void List_dir::set_cursor(List_dir::Dir_cache* dc, const path& cur)
+{
+	Dir_vector& vec = dc->vec;
+
+	if (vec.size() == 1)
+	{
+		// there's no other option
+		dc->cursor = vec.begin();
+		return;
+	}
+
+	Dir_cursor cursor =
+		std::find(vec.begin(), vec.end(), cur);
+
+	if (cursor != vec.end())
+		dc->cursor = cursor;
+	else
+		dc->cursor = vec.begin();
 }
 
 const List_dir::Dir_cursor& List_dir::get_cursor() const
