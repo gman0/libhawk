@@ -69,8 +69,7 @@ void Column::_ready()
 			{ "Handler already created" };
 	}
 
-	m_handler =
-		std::shared_ptr<Handler>{m_handler_closure(m_path, this)};
+	m_handler.reset(m_handler_closure(m_path, this));
 }
 
 void Column::_set_child_column(const Column* child_column)
