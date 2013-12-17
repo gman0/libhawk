@@ -29,6 +29,8 @@
 #include "handlers/Cache.h"
 
 namespace hawk {
+	class Column;
+
 	class List_dir : public Handler
 	{
 	public:
@@ -57,7 +59,8 @@ namespace hawk {
 		Dir_cache* m_active_cache;
 
 	public:
-		List_dir(const boost::filesystem::path& path);
+		List_dir(const boost::filesystem::path& path,
+			const Column* parent_column);
 		List_dir(const List_dir&) = delete;
 
 		List_dir(List_dir&& ld)
