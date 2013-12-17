@@ -22,38 +22,57 @@
 
 #include <memory>
 #include <utility>
+#include <vector>
 #include "Handler.h"
 #include "handlers/dir.h"
-#include "TypeFactory.h"
 
 namespace hawk {
 	class Column
 	{
 	private:
+		using Type_product =
+			std::function<Handler*(const boost::filesystem::path&,
+									Column*)>;
+
 		boost::filesystem::path m_path;
+
 		std::shared_ptr<Handler> m_handler;
+		Type_product m_handler_closure;
+
+		const Column* m_child_column;
 
 	public:
-		Column() {}
+		Column()
+			: m_child_column{}
+		{}
+
 		Column(const boost::filesystem::path& path,
-			const Type_factory::Type_product& tp);
+			const Type_product& tp);
 		Column(boost::filesystem::path&& path,
-			const Type_factory::Type_product& tp);
+			const Type_product& tp);
 
 		Column(const Column& col)
 			:
 			m_path{col.m_path},
-			m_handler{col.m_handler}
+			m_handler{col.m_handler},
+			m_handler_closure{col.m_handler_closure},
+			m_child_column{col.m_child_column}
 		{}
 
 		Column(Column&& col)
 			:
 			m_path{std::move(col.m_path)},
-			m_handler{std::move(col.m_handler)}
+			m_handler{std::move(col.m_handler)},
+			m_handler_closure{std::move(col.m_handler_closure)},
+			m_child_column{col.m_child_column}
 		{}
 
 		Column& operator=(const Column& col);
 		Column& operator=(Column&& col);
+
+		// for internal/expert use only
+		void _ready();
+		void _set_child_column(const Column* child_column);
 
 		Handler* get_handler();
 		const Handler* get_handler() const;
@@ -61,6 +80,7 @@ namespace hawk {
 		const boost::filesystem::path& get_path() const;
 		void set_path(const boost::filesystem::path& path);
 		void set_path(boost::filesystem::path&& path);
+		const boost::filesystem::path* get_child_path() const;
 	};
 }
 

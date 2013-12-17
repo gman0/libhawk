@@ -18,28 +18,35 @@
 */
 
 #include <utility>
+#include <exception>
 #include "Column.h"
+#include "Tab.h"
 
 using namespace hawk;
 using namespace boost::filesystem;
 
-Column::Column(const path& path,
+Column::Column(const path& p,
 	const Type_factory::Type_product& tp)
 	:
-	m_path{path},
-	m_handler{tp(path)}
+	m_path{p},
+	m_handler_closure{tp},
+	m_child_column{}
 {}
 
-Column::Column(path&& p, const Type_factory::Type_product& tp)
+Column::Column(path&& p,
+	const Type_factory::Type_product& tp)
 	:
 	m_path{std::move(p)},
-	m_handler{tp(m_path)}
+	m_handler_closure{tp},
+	m_child_column{}
 {}
 
 Column& Column::operator=(const Column& col)
 {
 	m_path = col.m_path;
 	m_handler = col.m_handler;
+	m_handler_closure = col.m_handler_closure;
+	m_child_column = col.m_child_column;
 
 	return *this;
 }
@@ -48,8 +55,27 @@ Column& Column::operator=(Column&& col)
 {
 	m_path = std::move(col.m_path);
 	m_handler = std::move(col.m_handler);
+	m_handler_closure = std::move(col.m_handler_closure);
+	m_child_column = col.m_child_column;
 
 	return *this;
+}
+
+void Column::_ready()
+{
+	if (m_handler)
+	{
+		throw std::logic_error
+			{ "Handler already created" };
+	}
+
+	m_handler =
+		std::shared_ptr<Handler>{m_handler_closure(m_path, this)};
+}
+
+void Column::_set_child_column(const Column* child_column)
+{
+	m_child_column = child_column;
 }
 
 Handler* Column::get_handler()
@@ -65,6 +91,14 @@ const Handler* Column::get_handler() const
 const path& Column::get_path() const
 {
 	return m_path;
+}
+
+const path* Column::get_child_path() const
+{
+	if (!m_child_column)
+		return nullptr;
+	else
+		return &m_child_column->get_path();
 }
 
 void Column::set_path(const path& p)
