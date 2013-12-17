@@ -24,9 +24,11 @@ using namespace std;
 using namespace hawk;
 using namespace boost::filesystem;
 
-Handler::Handler(const path& p, const string& type)
+Handler::Handler(const path& p, const Column* parent_column,
+	const string& type)
 	:
-	m_path{&p}
+	m_path{&p},
+	m_parent_column{parent_column}
 {
 	m_type = hash<string>()(type);
 }
@@ -49,4 +51,9 @@ bool Handler::operator!=(const Handler& h)
 void Handler::set_path(const path& p)
 {
 	m_path = &p;
+}
+
+const Column* Handler::get_parent_column() const
+{
+	return m_parent_column;
 }

@@ -25,35 +25,50 @@
 #include <utility>
 
 namespace hawk {
+	class Column;
+
 	class Handler
 	{
 	protected:
 		const boost::filesystem::path* m_path;
 		size_t m_type; // hash value of type
 
+		const Column* m_parent_column;
+
 	public:
 		Handler()
-			: m_path{}, m_type{}
+			:
+			m_path{},
+			m_type{},
+			m_parent_column{}
 		{}
 
 		// type as in the mime type
-		Handler(const boost::filesystem::path& path, const std::string& type);
+		Handler(const boost::filesystem::path& path,
+			const Column* parent_column,
+			const std::string& type);
 
-		Handler(const boost::filesystem::path& path, size_t hash)
+		Handler(const boost::filesystem::path& path,
+			const Column* parent_column,
+			size_t hash)
 			:
 			m_path{&path},
-			m_type{hash}
+			m_type{hash},
+			m_parent_column{parent_column}
 		{}
 
 		Handler(const Handler& h)
-			: m_path(h.m_path)
+			:
+			m_path{h.m_path},
+			m_type{h.m_type},
+			m_parent_column{h.m_parent_column}
 		{}
 
 		Handler(Handler&& h)
 			:
-			// m_path{std::move(h.m_path)},
 			m_path{h.m_path},
-			m_type{h.m_type}
+			m_type{h.m_type},
+			m_parent_column{h.m_parent_column}
 		{}
 
 		virtual ~Handler() {}
@@ -63,6 +78,8 @@ namespace hawk {
 		bool operator!=(const Handler& h);
 
 		virtual void set_path(const boost::filesystem::path& p);
+
+		const Column* get_parent_column() const;
 	};
 }
 
