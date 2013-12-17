@@ -22,8 +22,10 @@
 
 #include <unordered_map>
 #include <functional>
+#include <vector>
 #include <boost/filesystem/path.hpp>
 #include <magic.h>
+#include "Column.h"
 
 namespace hawk {
 	class Handler;
@@ -32,7 +34,8 @@ namespace hawk {
 	{
 	public:
 		using Type_product =
-			std::function<Handler*(const boost::filesystem::path&)>;
+			std::function<Handler*(const boost::filesystem::path&,
+									Column*)>;
 
 	private:
 		std::unordered_map<size_t, Type_product> m_types;
