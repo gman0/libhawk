@@ -24,32 +24,16 @@
 using namespace hawk;
 using namespace boost::filesystem;
 
-static std::vector<path> parent_paths;
-
-static void generate_parent_paths(std::vector<path>& v,
-	path& p, int n)
-{
-	v.clear(); // we need to start with a clean vector
-	v.push_back(p);
-
-	--n;
-	for (; n >= 0; --n)
-	{
-		p = p.parent_path();
-		v.push_back(p);
-	}
-}
-
-
 Tab::Tab(const path& pwd, unsigned ncols,
 	Type_factory* tf, const Type_factory::Type_product& list_dir_closure)
 	:
 	m_pwd{pwd},
+	m_columns{ncols},
 	m_type_factory{tf},
 	m_list_dir_closure{list_dir_closure},
 	m_has_preview{false}
 {
-	m_columns.reserve(ncols + 1);
+	m_columns.reserve(ncols + 5);
 	build_columns(ncols);
 }
 
@@ -57,6 +41,7 @@ Tab::Tab(path&& pwd, unsigned ncols,
 	Type_factory* tf, const Type_factory::Type_product& list_dir_closure)
 	:
 	m_pwd{std::move(pwd)},
+	m_columns{ncols},
 	m_type_factory{tf},
 	m_list_dir_closure{list_dir_closure},
 	m_has_preview{false}
@@ -111,12 +96,12 @@ void Tab::set_pwd(const path& pwd)
 	update_inactive_cursors();
 }
 
-std::vector<Column>& Tab::get_columns()
+Tab::Column_vector& Tab::get_columns()
 {
 	return m_columns;
 }
 
-const std::vector<Column>& Tab::get_columns() const
+const Tab::Column_vector& Tab::get_columns() const
 {
 	return m_columns;
 }
@@ -157,6 +142,7 @@ void Tab::set_cursor(const List_dir::Dir_cursor& cursor)
 	if (closure)
 	{
 		add_column(*cursor, closure);
+		m_columns.back()._ready();
 		m_has_preview = true;
 	}
 }
@@ -164,14 +150,29 @@ void Tab::set_cursor(const List_dir::Dir_cursor& cursor)
 void Tab::build_columns(unsigned ncols)
 {
 	path p = m_pwd;
-	generate_parent_paths(parent_paths, p, --ncols);
+	--ncols;
 
-	std::for_each(parent_paths.rbegin(), parent_paths.rend(),
-		[this](path& pwd) { add_column(std::move(pwd), m_list_dir_closure); });
-		// we can discard parent_paths' by moving them as we don't need
-		// them anymore
+	// create the columns
+	add_column(m_pwd, m_list_dir_closure, ncols);
+	for (int i = ncols - 1; i >= 0; i--)
+	{
+		p = p.parent_path();
+		add_column(p, m_list_dir_closure, i);
+	}
 
-	update_inactive_cursors();
+	// set their child columns and make them _ready
+	auto it = m_columns.cbegin();
+	for (size_t i = 0; i < ncols; i++)
+	{
+		Column& column = m_columns[i];
+
+		column._set_child_column(&(*++it));
+		column._ready();
+	}
+
+	// the last (active) column has no child
+	m_columns[ncols]._ready();
+
 	activate_last_column();
 	update_active_cursor();
 }

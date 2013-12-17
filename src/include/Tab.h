@@ -34,13 +34,16 @@ namespace hawk {
 
 	class Tab
 	{
+	public:
+		using Column_vector = std::vector<Column>;
+
 	private:
 		// PWD usually stands for Print Working Directory
 		// but there's no printing involved as this only
 		// holds the current working directory.
 		boost::filesystem::path m_pwd;
 
-		std::vector<Column> m_columns;
+		Column_vector m_columns;
 		Column* m_active_column;
 
 		Type_factory* m_type_factory;
@@ -81,8 +84,8 @@ namespace hawk {
 		void add_column(const boost::filesystem::path& pwd);
 		void remove_column();
 
-		std::vector<Column>& get_columns();
-		const std::vector<Column>& get_columns() const;
+		Column_vector& get_columns();
+		const Column_vector& get_columns() const;
 
 		Column* get_active_column() { return m_active_column; }
 		const Column* get_active_column() const { return m_active_column; }
@@ -117,6 +120,16 @@ namespace hawk {
 			}
 
 			return static_cast<List_dir*>(handler);
+		}
+
+		inline const boost::filesystem::path* get_last_column_path() const
+		{
+			if (m_columns.empty())
+				return nullptr;
+			else
+			{
+				return &(m_columns.back().get_path());
+			}
 		}
 
 		void update_active_cursor();
