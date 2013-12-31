@@ -25,8 +25,9 @@
 #include <ctime>
 #include <utility>
 #include <boost/filesystem.hpp>
+#include <unordered_map>
 #include "Handler.h"
-#include "handlers/Cache.h"
+#include "NoHash.h"
 
 namespace hawk {
 	class Column;
@@ -48,42 +49,52 @@ namespace hawk {
 		using Dir_vector = std::vector<Dir_entry>;
 		using Dir_cursor = Dir_vector::iterator;
 
-		struct Dir_cache
-		{
-			Dir_vector vec;
-			Dir_cursor cursor;
-		};
+		// The first size_t is the hash of the path to which
+		// the cursor belongs to (key) and the second size_t
+		// is the item in the directory to which the cursor
+		// points to.
+		using Cursor_map =
+			std::unordered_map<size_t, size_t, No_hash>;
 
 	private:
-		Cache<size_t, Dir_cache> m_cache;
-		Dir_cache* m_active_cache;
+		// This will hold the hash value of current path
+		// which will be used as a key in Tab's cursor map.
+		size_t m_path_hash;
+
+		Dir_vector m_dir_items;
+		Dir_cursor m_cursor;
 
 	public:
 		List_dir(const boost::filesystem::path& path,
-			const Column* parent_column);
+			Column* parent_column);
 		List_dir(const List_dir&) = delete;
 
 		List_dir(List_dir&& ld)
 			:
 			Handler{std::move(ld)},
-			m_cache{std::move(m_cache)},
-			m_active_cache{ld.m_active_cache}
-		{ ld.m_active_cache = nullptr; }
+			m_path_hash{ld.m_path_hash},
+			m_dir_items{std::move(ld.m_dir_items)},
+			m_cursor{std::move(ld.m_cursor)}
+		{ ld.m_path_hash = 0; }
 
 		List_dir& operator=(List_dir&& ld);
 
-		const Dir_cache* read() const { return m_active_cache; }
-		Dir_cache* read() { return m_active_cache; }
+		// Get a reference to the vector of current directory's contents.
+		Dir_vector& get_contents() { return m_dir_items; }
+		const Dir_vector& get_directory() const
+			{ return m_dir_items; }
 
 		void set_cursor(const Dir_cursor& cursor);
+
+		// Converts boost::filesystem::path to Dir_cursor
+		// and calls set_cursor(const Dir_cursor& cursor) afterwards.
 		void set_cursor(const boost::filesystem::path& cursor);
+
 		const Dir_cursor& get_cursor() const;
 		virtual void set_path(const boost::filesystem::path& path);
 
 	private:
-		void fill_cache(Dir_cache* dc);
-		void set_cursor(Dir_cache* dc,
-			const boost::filesystem::path& cursor);
+		void read_directory();
 	};
 }
 

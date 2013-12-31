@@ -24,11 +24,11 @@
 #include <boost/functional/hash.hpp>
 // ^ this resolves an undefined reference to boost::hash_range<>
 
-#include "Column.h"
-
 #include "handlers/dir.h"
-#include "handlers/Cache_impl.h"
 #include "handlers/dir_hash.h"
+
+#include "Tab.h"
+#include "Column.h"
 
 using namespace hawk;
 using namespace boost::filesystem;
@@ -36,88 +36,97 @@ using namespace boost::filesystem;
 constexpr int cache_threshold = 1024;
 
 List_dir::List_dir(const boost::filesystem::path& path,
-	const Column* parent_column)
+	Column* parent_column)
 	:
 	Handler{path, parent_column, get_handler_hash<List_dir>()},
-	m_cache{([this](List_dir::Dir_cache* dc){ fill_cache(dc); })}
+	m_path_hash{}
 {
-	if (path.empty())
-	{
-		m_active_cache = nullptr;
-		return;
-	}
-
-	if (!is_directory(path))
-		throw std::runtime_error
-				{ std::string{"Path '"} + path.c_str() + "' is not a directory" };
-
-	m_active_cache =
-		m_cache.switch_cache(last_write_time(path), hash_value(path));
+	set_path(path);
 }
 
 List_dir& List_dir::operator=(List_dir&& ld)
 {
-	m_path = ld.m_path;
-	m_type = ld.m_type;
-	m_cache = std::move(ld.m_cache);
-	m_active_cache = ld.m_active_cache;
-	ld.m_active_cache = nullptr;
+	Handler::operator=(std::move(ld));
+	m_path_hash = ld.m_path_hash;
+	m_dir_items = std::move(ld.m_dir_items);
+	m_cursor = std::move(ld.m_cursor);
 
 	return *this;
 }
 
-void List_dir::fill_cache(List_dir::Dir_cache* dc)
+void List_dir::read_directory()
 {
-	Dir_vector& vec = dc->vec;
-	vec.clear();
+	m_dir_items.clear();
 
 	// free up some space if we need to
-	if (vec.size() > cache_threshold)
-		vec.resize(cache_threshold);
+	if (m_dir_items.size() > cache_threshold)
+		m_dir_items.resize(cache_threshold);
 
-	std::copy(directory_iterator {*m_path}, directory_iterator {},
-				std::back_inserter(vec));
+	// gather the directory contents and move them to the vector
+	std::move(directory_iterator {*m_path}, directory_iterator {},
+				std::back_inserter(m_dir_items));
+
+	// set the cursor
 
 	const path* child_path = m_parent_column->get_child_path();
+
 	if (child_path)
-		set_cursor(dc, *child_path);
+		set_cursor(*child_path);
 	else
-		dc->cursor = vec.begin();
+	{
+		// try to retrieve the last used cursor
+
+		Tab* tab = m_parent_column->get_parent_tab();
+		List_dir::Cursor_map::iterator cursor_hash_it;
+
+		if (tab->find_cursor(m_path_hash, cursor_hash_it))
+		{
+			// ok, so we DID find the hash of the cursor,
+			// now let's assign it to the correct Dir_vector
+			// item if we can
+			size_t cursor_hash = cursor_hash_it->second;
+
+			Dir_cursor cursor =
+				std::find_if(m_dir_items.begin(), m_dir_items.end(),
+					[cursor_hash](const Dir_entry& item)
+					{ return (hash_value(item) == cursor_hash); }
+				);
+
+			if (cursor != m_dir_items.end())
+			{
+				m_cursor = cursor;
+				return;
+			}
+		}
+
+		// we didn't find the cursor, let's use the first
+		// item of our Dir_vector as the cursor
+		m_cursor = m_dir_items.begin();
+	}
 }
 
 void List_dir::set_cursor(const List_dir::Dir_cursor& cursor)
 {
-	m_active_cache->cursor = cursor;
+	m_cursor = cursor;
+
+	size_t cursor_hash = hash_value(*cursor);
+	m_parent_column->get_parent_tab()->store_cursor(m_path_hash, cursor_hash);
 }
 
 void List_dir::set_cursor(const path& cur)
 {
-	set_cursor(m_active_cache, cur);
-}
-
-void List_dir::set_cursor(List_dir::Dir_cache* dc, const path& cur)
-{
-	Dir_vector& vec = dc->vec;
-
-	if (vec.size() == 1 || cur.empty())
-	{
-		// there's no other option
-		dc->cursor = vec.begin();
-		return;
-	}
-
 	Dir_cursor cursor =
-		std::find(vec.begin(), vec.end(), cur);
+		std::find(m_dir_items.begin(), m_dir_items.end(), cur);
 
-	if (cursor != vec.end())
-		dc->cursor = cursor;
+	if (cursor != m_dir_items.end())
+		set_cursor(cursor);
 	else
-		dc->cursor = vec.begin();
+		set_cursor(m_dir_items.begin());
 }
 
 const List_dir::Dir_cursor& List_dir::get_cursor() const
 {
-	return m_active_cache->cursor;
+	return m_cursor;
 }
 
 void List_dir::set_path(const path& dir)
@@ -126,7 +135,9 @@ void List_dir::set_path(const path& dir)
 
 	if (dir.empty())
 	{
-		m_active_cache = nullptr;
+		m_dir_items.clear();
+		m_path_hash = 0;
+
 		return;
 	}
 
@@ -136,6 +147,7 @@ void List_dir::set_path(const path& dir)
 			{ std::string {"\""} + dir.c_str() + "\" is not a directory" };
 	}
 
-	m_active_cache =
-		m_cache.switch_cache(last_write_time(dir), hash_value(dir));
+	m_path_hash = hash_value(dir);
+
+	read_directory();
 }
