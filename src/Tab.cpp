@@ -56,9 +56,24 @@ Tab::Tab(const Tab& t)
 	m_columns{t.m_columns},
 	m_type_factory{t.m_type_factory},
 	m_list_dir_closure{t.m_list_dir_closure},
-	m_has_preview{t.m_has_preview}
+	m_has_preview{t.m_has_preview},
+	m_cursor_map{t.m_cursor_map}
 {
 	m_active_column = &(m_columns.back());
+	update_cols_tab_ptr();
+}
+
+Tab::Tab(Tab&& t)
+	:
+	m_pwd{std::move(t.m_pwd)},
+	m_columns{std::move(t.m_columns)},
+	m_active_column{t.m_active_column},
+	m_type_factory{t.m_type_factory},
+	m_has_preview{t.m_has_preview},
+	m_cursor_map{std::move(t.m_cursor_map)}
+{
+	t.m_active_column = nullptr;
+	update_cols_tab_ptr();
 }
 
 Tab& Tab::operator=(const Tab& t)
@@ -68,6 +83,9 @@ Tab& Tab::operator=(const Tab& t)
 	m_type_factory = t.m_type_factory;
 	m_list_dir_closure = t.m_list_dir_closure;
 	m_has_preview = t.m_has_preview;
+	m_cursor_map = t.m_cursor_map;
+
+	update_cols_tab_ptr();
 
 	return *this;
 }
@@ -79,6 +97,9 @@ Tab& Tab::operator=(Tab&& t)
 	m_type_factory = t.m_type_factory;
 	m_list_dir_closure = std::move(t.m_list_dir_closure);
 	m_has_preview = t.m_has_preview;
+	m_cursor_map = t.m_cursor_map;
+
+	update_cols_tab_ptr();
 
 	return *this;
 }
@@ -116,7 +137,7 @@ List_dir::Dir_cursor Tab::get_begin_cursor() const
 {
 	List_dir* ld =
 		static_cast<List_dir*>(m_active_column->get_handler());
-	return ld->read()->vec.begin();
+	return ld->get_contents().begin();
 }
 
 void Tab::set_cursor(const List_dir::Dir_cursor& cursor)
@@ -196,6 +217,8 @@ void Tab::remove_column()
 		return;
 
 	m_columns.erase(m_columns.begin());
+
+	// update_paths(m_pwd);
 }
 
 void Tab::add_column(const path& pwd)
@@ -206,19 +229,19 @@ void Tab::add_column(const path& pwd)
 void Tab::add_column(const path& pwd,
 	const Type_factory::Type_product& closure)
 {
-	m_columns.push_back({pwd, closure});
+	m_columns.push_back({pwd, closure, this});
 }
 
 void Tab::add_column(path&& pwd,
 	const Type_factory::Type_product& closure)
 {
-	m_columns.push_back({std::move(pwd), closure});
+	m_columns.push_back({std::move(pwd), closure, this});
 }
 
 void Tab::add_column(const path& pwd,
 	const Type_factory::Type_product& closure, unsigned inplace_col)
 {
-	m_columns[inplace_col] = {pwd, closure};
+	m_columns[inplace_col] = {pwd, closure, this};
 }
 
 void Tab::update_active_cursor()
@@ -243,4 +266,22 @@ void Tab::update_inactive_cursors()
 
 		ld->set_cursor(next_path);
 	}
+}
+
+bool Tab::find_cursor(size_t cursor_hash,
+	List_dir::Cursor_map::iterator& it)
+{
+	it = m_cursor_map.find(cursor_hash);
+	return (it != m_cursor_map.end());
+}
+
+void Tab::store_cursor(size_t key, size_t cursor_hash)
+{
+	m_cursor_map[key] = cursor_hash;
+}
+
+void Tab::update_cols_tab_ptr()
+{
+	for (auto& col : m_columns)
+		col._set_parent_tab(this);
 }

@@ -55,6 +55,11 @@ namespace hawk {
 		// there can be only one preview.
 		bool m_has_preview;
 
+		// This cursor map stores all cursors. It is shared
+		// between all List_dir handlers that exist in a
+		// particular Tab.
+		List_dir::Cursor_map m_cursor_map;
+
 	public:
 		Tab(const boost::filesystem::path& pwd,
 			unsigned ncols,
@@ -65,15 +70,7 @@ namespace hawk {
 			Type_factory* tf,
 			const Type_factory::Type_product& list_dir_closure);
 		Tab(const Tab& t);
-
-		Tab(Tab&& t)
-			:
-			m_pwd{std::move(t.m_pwd)},
-			m_columns{std::move(t.m_columns)},
-			m_active_column{t.m_active_column},
-			m_type_factory{t.m_type_factory},
-			m_has_preview{t.m_has_preview}
-		{ t.m_active_column = nullptr; }
+		Tab(Tab&& t);
 
 		Tab& operator=(const Tab& t);
 		Tab& operator=(Tab&& t);
@@ -93,6 +90,18 @@ namespace hawk {
 
 		List_dir::Dir_cursor get_begin_cursor() const;
 		void set_cursor(const List_dir::Dir_cursor& cursor);
+
+		// Tries to find a cursor with key cursor_hash.
+		// Returns true on success (that is result != m_cursor_map.end()).
+		// The resulting find iterator is stored in iter.
+		bool find_cursor(size_t cursor_hash,
+			List_dir::Cursor_map::iterator& iter);
+
+		// Stores a cursor in the cursor map.
+		void store_cursor(size_t key, size_t cursor_hash);
+
+		List_dir::Cursor_map&
+			get_cursor_map() { return m_cursor_map; }
 
 	private:
 		void build_columns(unsigned ncols);
@@ -127,13 +136,15 @@ namespace hawk {
 			if (m_columns.empty())
 				return nullptr;
 			else
-			{
 				return &(m_columns.back().get_path());
-			}
 		}
 
 		void update_active_cursor();
 		void update_inactive_cursors();
+
+		// Updates pointers to this instance of Tab of all columns
+		// by calling their _set_parent_tab methods.
+		void update_cols_tab_ptr();
 	};
 }
 
