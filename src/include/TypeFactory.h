@@ -25,6 +25,7 @@
 #include <vector>
 #include <boost/filesystem/path.hpp>
 #include <magic.h>
+#include "NoHash.h"
 #include "Column.h"
 
 namespace hawk {
@@ -38,7 +39,7 @@ namespace hawk {
 									Column*)>;
 
 	private:
-		std::unordered_map<size_t, Type_product> m_types;
+		std::unordered_map<size_t, Type_product, No_hash> m_types;
 
 		struct Magic_guard
 		{
