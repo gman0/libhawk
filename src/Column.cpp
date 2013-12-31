@@ -26,19 +26,23 @@ using namespace hawk;
 using namespace boost::filesystem;
 
 Column::Column(const path& p,
-	const Type_factory::Type_product& tp)
+	const Type_factory::Type_product& tp,
+	Tab* parent_tab)
 	:
 	m_path{p},
 	m_handler_closure{tp},
-	m_child_column{}
+	m_child_column{},
+	m_parent_tab{parent_tab}
 {}
 
 Column::Column(path&& p,
-	const Type_factory::Type_product& tp)
+	const Type_factory::Type_product& tp,
+	Tab* parent_tab)
 	:
 	m_path{std::move(p)},
 	m_handler_closure{tp},
-	m_child_column{}
+	m_child_column{},
+	m_parent_tab{parent_tab}
 {}
 
 Column& Column::operator=(const Column& col)
@@ -47,6 +51,7 @@ Column& Column::operator=(const Column& col)
 	m_handler = col.m_handler;
 	m_handler_closure = col.m_handler_closure;
 	m_child_column = col.m_child_column;
+	m_parent_tab = col.m_parent_tab;
 
 	return *this;
 }
@@ -57,6 +62,7 @@ Column& Column::operator=(Column&& col)
 	m_handler = std::move(col.m_handler);
 	m_handler_closure = std::move(col.m_handler_closure);
 	m_child_column = col.m_child_column;
+	m_parent_tab = col.m_parent_tab;
 
 	return *this;
 }
@@ -75,6 +81,11 @@ void Column::_ready()
 void Column::_set_child_column(const Column* child_column)
 {
 	m_child_column = child_column;
+}
+
+void Column::_set_parent_tab(Tab* tab)
+{
+	m_parent_tab = tab;
 }
 
 Handler* Column::get_handler()

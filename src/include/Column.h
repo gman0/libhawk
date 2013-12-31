@@ -27,6 +27,8 @@
 #include "handlers/dir.h"
 
 namespace hawk {
+	class Tab;
+
 	class Column
 	{
 	private:
@@ -40,23 +42,27 @@ namespace hawk {
 		Type_product m_handler_closure;
 
 		const Column* m_child_column;
+		Tab* m_parent_tab;
 
 	public:
 		Column()
-			: m_child_column{}
+			:
+			m_child_column{},
+			m_parent_tab{}
 		{}
 
 		Column(const boost::filesystem::path& path,
-			const Type_product& tp);
+			const Type_product& tp, Tab* parent_tab);
 		Column(boost::filesystem::path&& path,
-			const Type_product& tp);
+			const Type_product& tp, Tab* parent_tab);
 
 		Column(const Column& col)
 			:
 			m_path{col.m_path},
 			m_handler{col.m_handler},
 			m_handler_closure{col.m_handler_closure},
-			m_child_column{col.m_child_column}
+			m_child_column{col.m_child_column},
+			m_parent_tab{col.m_parent_tab}
 		{}
 
 		Column(Column&& col)
@@ -64,7 +70,8 @@ namespace hawk {
 			m_path{std::move(col.m_path)},
 			m_handler{std::move(col.m_handler)},
 			m_handler_closure{std::move(col.m_handler_closure)},
-			m_child_column{col.m_child_column}
+			m_child_column{col.m_child_column},
+			m_parent_tab{col.m_parent_tab}
 		{}
 
 		Column& operator=(const Column& col);
@@ -73,6 +80,7 @@ namespace hawk {
 		// for internal/expert use only
 		void _ready();
 		void _set_child_column(const Column* child_column);
+		void _set_parent_tab(Tab* tab);
 
 		Handler* get_handler();
 		const Handler* get_handler() const;
@@ -80,7 +88,9 @@ namespace hawk {
 		const boost::filesystem::path& get_path() const;
 		void set_path(const boost::filesystem::path& path);
 		void set_path(boost::filesystem::path&& path);
+
 		const boost::filesystem::path* get_child_path() const;
+		Tab* get_parent_tab() { return m_parent_tab; }
 	};
 }
 
