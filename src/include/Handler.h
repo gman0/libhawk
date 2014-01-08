@@ -60,28 +60,13 @@ namespace hawk {
 			m_parent_column{parent_column}
 		{}
 
-		Handler(const Handler& h)
-			:
-			m_path{h.m_path},
-			m_type{h.m_type},
-			m_parent_column{h.m_parent_column}
-		{}
-
-		Handler(Handler&& h)
-			:
-			m_path{h.m_path},
-			m_type{h.m_type},
-			m_parent_column{h.m_parent_column}
-		{}
-
-		virtual ~Handler() {}
-
-		Handler& operator=(Handler&& h);
+		virtual ~Handler() = default;
 
 		size_t get_type() const;
 		bool operator==(const Handler& h);
 		bool operator!=(const Handler& h);
 
+		// set_path is called internally from Column
 		virtual void set_path(const boost::filesystem::path& p);
 		const boost::filesystem::path* get_path() const
 			{ return m_path; }
