@@ -65,7 +65,7 @@ namespace hawk {
 			m_parent_tab{col.m_parent_tab}
 		{}
 
-		Column(Column&& col)
+		Column(Column&& col) noexcept
 			:
 			m_path{std::move(col.m_path)},
 			m_handler{std::move(col.m_handler)},
