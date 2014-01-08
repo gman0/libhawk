@@ -89,7 +89,7 @@ namespace hawk {
 		size_t get_current_ncols(); // don't confuse this with the size of column vector
 
 		List_dir::Dir_cursor get_begin_cursor() const;
-		void set_cursor(const List_dir::Dir_cursor& cursor);
+		void set_cursor(List_dir::Dir_cursor cursor);
 
 		// Tries to find a cursor with key cursor_hash.
 		// Returns true on success (that is result != m_cursor_map.end()).

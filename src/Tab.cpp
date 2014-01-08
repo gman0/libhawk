@@ -21,8 +21,9 @@
 #include <algorithm>
 #include "Tab.h"
 
-using namespace hawk;
 using namespace boost::filesystem;
+
+namespace hawk {
 
 Tab::Tab(const path& pwd, unsigned ncols,
 	Type_factory* tf, const Type_factory::Type_product& list_dir_closure)
@@ -114,7 +115,7 @@ void Tab::set_pwd(const path& pwd)
 	m_pwd = pwd;
 	update_paths(pwd);
 	update_active_cursor();
-	update_inactive_cursors();
+	// update_inactive_cursors();
 }
 
 Tab::Column_vector& Tab::get_columns()
@@ -140,7 +141,7 @@ List_dir::Dir_cursor Tab::get_begin_cursor() const
 	return ld->get_contents().begin();
 }
 
-void Tab::set_cursor(const List_dir::Dir_cursor& cursor)
+void Tab::set_cursor(List_dir::Dir_cursor cursor)
 {
 	// remove current preview column (if any)
 	if (m_has_preview)
@@ -152,8 +153,14 @@ void Tab::set_cursor(const List_dir::Dir_cursor& cursor)
 	// reset the active column
 	activate_last_column();
 
+	List_dir* ld =
+		get_list_dir_handler(m_active_column->get_handler());
+
+	if (ld->empty())
+		return;
+
 	// set the cursor in the active column
-	get_list_dir_handler(m_active_column->get_handler())->set_cursor(cursor);
+	ld->set_cursor(cursor);
 
 	// add new preview column if we need to
 
@@ -285,3 +292,5 @@ void Tab::update_cols_tab_ptr()
 	for (auto& col : m_columns)
 		col._set_parent_tab(this);
 }
+
+} // namespace hawk
