@@ -22,8 +22,9 @@
 #include "TypeFactory.h"
 #include "Handler.h"
 
-using namespace hawk;
 using namespace boost::filesystem;
+
+namespace hawk {
 
 Type_factory::Magic_guard::Magic_guard()
 {
@@ -78,3 +79,5 @@ size_t Type_factory::get_hash_type(const path& p)
 {
 	return std::hash<std::string>()({get_mime(p)});
 }
+
+} //namespace hawk

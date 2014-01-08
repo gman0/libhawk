@@ -22,7 +22,7 @@
 #include "TabManager.h"
 #include "handlers/dir_hash_extern.h"
 
-using namespace hawk;
+namespace hawk {
 
 Tab_manager::Tab_manager(Type_factory* tf, unsigned ncols)
 	:
@@ -88,3 +88,5 @@ int Tab_manager::count() const
 {
 	return m_tabs.size();
 }
+
+} // namespace hawk

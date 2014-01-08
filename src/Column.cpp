@@ -22,8 +22,9 @@
 #include "Column.h"
 #include "Tab.h"
 
-using namespace hawk;
 using namespace boost::filesystem;
+
+namespace hawk {
 
 Column::Column(const path& p,
 	const Type_factory::Type_product& tp,
@@ -122,3 +123,5 @@ void Column::set_path(path&& p)
 	m_path = std::move(p);
 	m_handler->set_path(m_path);
 }
+
+} // namespace hawk
