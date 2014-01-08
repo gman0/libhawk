@@ -30,10 +30,11 @@
 #include "Tab.h"
 #include "Column.h"
 
-using namespace hawk;
 using namespace boost::filesystem;
 
 constexpr int cache_threshold = 1024;
+
+namespace hawk {
 
 List_dir::List_dir(const boost::filesystem::path& path,
 	Column* parent_column)
@@ -70,6 +71,7 @@ void List_dir::read_directory()
 
 	const path* child_path = m_parent_column->get_child_path();
 
+	// do we have a child path (i.e. child column)?
 	if (child_path)
 		set_cursor(*child_path);
 	else
@@ -100,16 +102,22 @@ void List_dir::read_directory()
 		}
 
 		// we didn't find the cursor, let's use the first
-		// item of our Dir_vector as the cursor
+		// item of our Dir_vector as the cursor (or the
+		// end() iterator if the vector is empty)
 		m_cursor = m_dir_items.begin();
 	}
 }
 
-void List_dir::set_cursor(const List_dir::Dir_cursor& cursor)
+void List_dir::set_cursor(List_dir::Dir_cursor cursor)
 {
-	m_cursor = cursor;
+	m_cursor = std::move(cursor);
+	size_t cursor_hash;
 
-	size_t cursor_hash = hash_value(*cursor);
+	if (m_dir_items.empty())
+		cursor_hash = 0;
+	else
+		cursor_hash = hash_value(*m_cursor);
+
 	m_parent_column->get_parent_tab()->store_cursor(m_path_hash, cursor_hash);
 }
 
@@ -124,13 +132,21 @@ void List_dir::set_cursor(const path& cur)
 		set_cursor(m_dir_items.begin());
 }
 
-const List_dir::Dir_cursor& List_dir::get_cursor() const
+List_dir::Dir_cursor List_dir::get_cursor() const
 {
 	return m_cursor;
 }
 
 void List_dir::set_path(const path& dir)
 {
+	/*
+	 * I'll uncomment this when I'll feel like it.
+	 *
+	// don't waste our time!
+	if (dir == *m_path)
+		return;
+	*/
+
 	Handler::set_path(dir);
 
 	if (dir.empty())
@@ -151,3 +167,5 @@ void List_dir::set_path(const path& dir)
 
 	read_directory();
 }
+
+} // namespace hawk

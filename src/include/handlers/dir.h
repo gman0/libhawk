@@ -69,7 +69,7 @@ namespace hawk {
 			Column* parent_column);
 		List_dir(const List_dir&) = delete;
 
-		List_dir(List_dir&& ld)
+		List_dir(List_dir&& ld) noexcept
 			:
 			Handler{std::move(ld)},
 			m_path_hash{ld.m_path_hash},
@@ -81,16 +81,18 @@ namespace hawk {
 
 		// Get a reference to the vector of current directory's contents.
 		Dir_vector& get_contents() { return m_dir_items; }
-		const Dir_vector& get_directory() const
+		const Dir_vector& get_contents() const
 			{ return m_dir_items; }
 
-		void set_cursor(const Dir_cursor& cursor);
+		inline bool empty() const { return m_dir_items.empty(); }
+
+		void set_cursor(Dir_cursor cursor);
 
 		// Converts boost::filesystem::path to Dir_cursor
 		// and calls set_cursor(const Dir_cursor& cursor) afterwards.
 		void set_cursor(const boost::filesystem::path& cursor);
 
-		const Dir_cursor& get_cursor() const;
+		Dir_cursor get_cursor() const;
 		virtual void set_path(const boost::filesystem::path& path);
 
 	private:
