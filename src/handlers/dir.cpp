@@ -139,14 +139,6 @@ List_dir::Dir_cursor List_dir::get_cursor() const
 
 void List_dir::set_path(const path& dir)
 {
-	/*
-	 * I'll uncomment this when I'll feel like it.
-	 *
-	// don't waste our time!
-	if (dir == *m_path)
-		return;
-	*/
-
 	Handler::set_path(dir);
 
 	if (dir.empty())
