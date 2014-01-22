@@ -86,13 +86,13 @@ namespace hawk {
 
 		inline bool empty() const { return m_dir_items.empty(); }
 
+		Dir_cursor get_cursor() const;
 		void set_cursor(Dir_cursor cursor);
 
 		// Converts boost::filesystem::path to Dir_cursor
 		// and calls set_cursor(const Dir_cursor& cursor) afterwards.
 		void set_cursor(const boost::filesystem::path& cursor);
 
-		Dir_cursor get_cursor() const;
 		virtual void set_path(const boost::filesystem::path& path);
 
 	private:
