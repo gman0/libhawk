@@ -23,6 +23,7 @@
 #include <unordered_map>
 #include <functional>
 #include <vector>
+#include <utility>
 #include <boost/filesystem/path.hpp>
 #include <magic.h>
 #include "NoHash.h"
@@ -39,7 +40,10 @@ namespace hawk {
 									Column*)>;
 
 	private:
-		std::unordered_map<size_t, Type_product, No_hash> m_types;
+		using Type_map =
+			std::unordered_map<size_t, Type_product, No_hash>;
+
+		Type_map m_types;
 
 		struct Magic_guard
 		{
@@ -59,6 +63,13 @@ namespace hawk {
 
 		const char* get_mime(const boost::filesystem::path& p);
 		size_t get_hash_type(const boost::filesystem::path& p);
+
+	private:
+		static inline bool find_predicate(const Type_map::value_type& v, size_t find)
+		{
+			constexpr int half_size_t = sizeof(size_t) * 4;
+			return (v.first >> half_size_t) == ((v.first >> half_size_t) & (find >> half_size_t));
+		}
 	};
 }
 

@@ -17,18 +17,26 @@
 	along with libhawk.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <algorithm>
 #include <exception>
 #include <string>
 #include "TypeFactory.h"
 #include "Handler.h"
+#include "calchash.h"
 
 using namespace boost::filesystem;
+
+constexpr int half_size_t = sizeof(size_t) * 4;
 
 namespace hawk {
 
 Type_factory::Magic_guard::Magic_guard()
 {
-	magic_cookie = magic_open(MAGIC_MIME_TYPE);
+	magic_cookie = magic_open(MAGIC_MIME_TYPE
+							// follow the symlinks
+							| MAGIC_SYMLINK 
+							// don't look for known tokens in ASCII files
+							| MAGIC_NO_CHECK_TOKENS);
 	magic_load(magic_cookie, nullptr);
 }
 
@@ -44,7 +52,7 @@ Type_factory::Type_factory()
 		throw std::runtime_error
 			{
 				std::string {"Cannot load magic database: "}
-				+ magic_error(m_magic_guard.magic_cookie)
+					+ magic_error(m_magic_guard.magic_cookie)
 			};
 	}
 }
@@ -57,12 +65,22 @@ void Type_factory::register_type(size_t type,
 
 Type_factory::Type_product Type_factory::operator[](size_t type)
 {
-	auto tp_iterator = m_types.find(type);
+	auto it = std::find_if(m_types.begin(), m_types.end(),
+		[&type](const Type_map::value_type& v){ return find_predicate(v, type); });
 
-	if (tp_iterator == m_types.end())
+	if (it == m_types.end())
 		return Type_product {nullptr};
 
-	return tp_iterator->second;
+	// We've got the mime-type category figured out, now let's check
+	// if we need to check for the specific type too.
+	if (((size_t)~0 >> half_size_t) & it->first)
+	{
+		// ok we need to check the whole mime type hash
+		if (type != it->first)
+			return Type_product {nullptr};
+	}
+
+	return it->second;
 }
 
 Type_factory::Type_product Type_factory::operator[](const path& p)
@@ -77,7 +95,10 @@ const char* Type_factory::get_mime(const path& p)
 
 size_t Type_factory::get_hash_type(const path& p)
 {
-	return std::hash<std::string>()({get_mime(p)});
+	// check only for the category
+	static std::string mime;
+	mime = get_mime(p);
+	return calculate_mime_hash(mime);
 }
 
 } //namespace hawk
