@@ -23,9 +23,10 @@
 #include <functional>
 #include "handlers/dir.h"
 #include "handlers/hash.h"
+#include "calchash.h"
 
 static std::string type { "inode/directory" };
-static size_t hash = std::hash<std::string>()(type);
+static size_t hash = hawk::calculate_mime_hash(type);
 
 namespace hawk {
 	template <>
