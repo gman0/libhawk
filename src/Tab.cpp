@@ -112,6 +112,8 @@ const path& Tab::get_pwd() const
 
 void Tab::set_pwd(const path& pwd)
 {
+	if (pwd.empty()) return;
+
 	m_pwd = pwd;
 	update_paths(pwd);
 	update_active_cursor();
