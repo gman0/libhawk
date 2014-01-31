@@ -117,7 +117,6 @@ void Tab::set_pwd(const path& pwd)
 	m_pwd = pwd;
 	update_paths(pwd);
 	update_active_cursor();
-	// update_inactive_cursors();
 }
 
 Tab::Column_vector& Tab::get_columns()
@@ -167,11 +166,11 @@ void Tab::set_cursor(List_dir::Dir_cursor cursor)
 	// add new preview column if we need to
 
 	Type_factory::Type_product closure =
-		(*m_type_factory)[*cursor];
+		(*m_type_factory)[cursor->path];
 
 	if (closure)
 	{
-		add_column(*cursor, closure);
+		add_column(cursor->path, closure);
 		m_columns.back()._ready();
 		m_has_preview = true;
 	}
@@ -259,22 +258,6 @@ void Tab::update_active_cursor()
 		static_cast<List_dir*>(m_active_column->get_handler());
 
 	set_cursor(active_handler->get_cursor());
-}
-
-void Tab::update_inactive_cursors()
-{
-	// we don't want the preview nor the active List_dir
-	size_t ncols = get_current_ncols();
-
-	auto end_col_it = m_columns.begin() + ncols;
-	for (auto col_it = m_columns.begin(); col_it != end_col_it;
-		 ++col_it)
-	{
-		List_dir* ld = get_list_dir_handler(col_it->get_handler());
-		const path& next_path = (col_it + 1)->get_path();
-
-		ld->set_cursor(next_path);
-	}
 }
 
 bool Tab::find_cursor(size_t cursor_hash,

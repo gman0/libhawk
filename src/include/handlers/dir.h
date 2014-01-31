@@ -35,16 +35,12 @@ namespace hawk {
 	class List_dir : public Handler
 	{
 	public:
-		/*
 		struct Dir_entry
 		{
 			std::time_t timestamp;
 			boost::filesystem::path path;
 			boost::filesystem::file_status status;
 		};
-		*/
-
-		using Dir_entry = boost::filesystem::path;
 
 		using Dir_vector = std::vector<Dir_entry>;
 		using Dir_cursor = Dir_vector::iterator;

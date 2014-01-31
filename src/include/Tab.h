@@ -140,7 +140,6 @@ namespace hawk {
 		}
 
 		void update_active_cursor();
-		void update_inactive_cursors();
 
 		// Updates pointers to this instance of Tab of all columns
 		// by calling their _set_parent_tab methods.

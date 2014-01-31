@@ -64,8 +64,15 @@ void List_dir::read_directory()
 		m_dir_items.resize(cache_threshold);
 
 	// gather the directory contents and move them to the vector
-	std::move(directory_iterator {*m_path}, directory_iterator {},
-				std::back_inserter(m_dir_items));
+	directory_iterator dir_it_end;
+	for (auto dir_it = directory_iterator {*m_path};
+		 dir_it != dir_it_end;
+		 ++dir_it)
+	{
+		Dir_entry de;
+		de.path = std::move(*dir_it);
+		m_dir_items.push_back(std::move(de));
+	}
 
 	// set the cursor
 
@@ -91,7 +98,7 @@ void List_dir::read_directory()
 			Dir_cursor cursor =
 				std::find_if(m_dir_items.begin(), m_dir_items.end(),
 					[cursor_hash](const Dir_entry& item)
-					{ return (hash_value(item) == cursor_hash); }
+					{ return (hash_value(item.path) == cursor_hash); }
 				);
 
 			if (cursor != m_dir_items.end())
@@ -116,15 +123,19 @@ void List_dir::set_cursor(List_dir::Dir_cursor cursor)
 	if (m_dir_items.empty())
 		cursor_hash = 0;
 	else
-		cursor_hash = hash_value(*m_cursor);
+		cursor_hash = hash_value(m_cursor->path);
 
 	m_parent_column->get_parent_tab()->store_cursor(m_path_hash, cursor_hash);
 }
 
 void List_dir::set_cursor(const path& cur)
 {
+	size_t cursor_hash = hash_value(cur);
+
 	Dir_cursor cursor =
-		std::find(m_dir_items.begin(), m_dir_items.end(), cur);
+		std::find_if(m_dir_items.begin(), m_dir_items.end(),
+			[&cursor_hash](const Dir_entry& dir_ent)
+			{ return (hash_value(dir_ent.path) == cursor_hash); });
 
 	if (cursor != m_dir_items.end())
 		set_cursor(cursor);
