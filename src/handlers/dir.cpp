@@ -69,9 +69,11 @@ void List_dir::read_directory()
 		 dir_it != dir_it_end;
 		 ++dir_it)
 	{
-		Dir_entry de;
-		de.path = std::move(*dir_it);
-		m_dir_items.push_back(std::move(de));
+		Dir_entry dir_ent;
+		dir_ent.path = std::move(*dir_it);
+		dir_ent.status = status(dir_ent.path);
+
+		m_dir_items.push_back(std::move(dir_ent));
 	}
 
 	// set the cursor
