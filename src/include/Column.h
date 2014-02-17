@@ -56,27 +56,6 @@ namespace hawk {
 		Column(boost::filesystem::path&& path,
 			const Type_product& tp, Tab* parent_tab);
 
-		Column(const Column& col)
-			:
-			m_path{col.m_path},
-			m_handler{col.m_handler},
-			m_handler_closure{col.m_handler_closure},
-			m_child_column{col.m_child_column},
-			m_parent_tab{col.m_parent_tab}
-		{}
-
-		Column(Column&& col) noexcept
-			:
-			m_path{std::move(col.m_path)},
-			m_handler{std::move(col.m_handler)},
-			m_handler_closure{std::move(col.m_handler_closure)},
-			m_child_column{col.m_child_column},
-			m_parent_tab{col.m_parent_tab}
-		{}
-
-		Column& operator=(const Column& col);
-		Column& operator=(Column&& col);
-
 		// for internal/expert use only
 		void _ready();
 		void _set_child_column(const Column* child_column);

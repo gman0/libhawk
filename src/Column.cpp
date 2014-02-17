@@ -46,28 +46,6 @@ Column::Column(path&& p,
 	m_parent_tab{parent_tab}
 {}
 
-Column& Column::operator=(const Column& col)
-{
-	m_path = col.m_path;
-	m_handler = col.m_handler;
-	m_handler_closure = col.m_handler_closure;
-	m_child_column = col.m_child_column;
-	m_parent_tab = col.m_parent_tab;
-
-	return *this;
-}
-
-Column& Column::operator=(Column&& col)
-{
-	m_path = std::move(col.m_path);
-	m_handler = std::move(col.m_handler);
-	m_handler_closure = std::move(col.m_handler_closure);
-	m_child_column = col.m_child_column;
-	m_parent_tab = col.m_parent_tab;
-
-	return *this;
-}
-
 void Column::_ready()
 {
 	if (m_handler)
