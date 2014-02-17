@@ -55,7 +55,7 @@ List_dir& List_dir::operator=(List_dir&& ld)
 	return *this;
 }
 
-void List_dir::read_directory()
+bool List_dir::read_directory()
 {
 	m_dir_items.clear();
 
@@ -82,7 +82,10 @@ void List_dir::read_directory()
 
 	// do we have a child path (i.e. child column)?
 	if (child_path)
+	{
 		set_cursor(*child_path);
+		return false;
+	}
 	else
 	{
 		// try to retrieve the last used cursor
@@ -106,7 +109,7 @@ void List_dir::read_directory()
 			if (cursor != m_dir_items.end())
 			{
 				m_cursor = cursor;
-				return;
+				return false;
 			}
 		}
 
@@ -115,6 +118,8 @@ void List_dir::read_directory()
 		// end() iterator if the vector is empty)
 		m_cursor = m_dir_items.begin();
 	}
+
+	return true;
 }
 
 void List_dir::set_cursor(List_dir::Dir_cursor cursor)
@@ -128,6 +133,8 @@ void List_dir::set_cursor(List_dir::Dir_cursor cursor)
 		cursor_hash = hash_value(m_cursor->path);
 
 	m_parent_column->get_parent_tab()->store_cursor(m_path_hash, cursor_hash);
+
+	m_implicit_cursor = false;
 }
 
 void List_dir::set_cursor(const path& cur)
@@ -136,18 +143,15 @@ void List_dir::set_cursor(const path& cur)
 
 	Dir_cursor cursor =
 		std::find_if(m_dir_items.begin(), m_dir_items.end(),
-			[&cursor_hash](const Dir_entry& dir_ent)
-			{ return (hash_value(dir_ent.path) == cursor_hash); });
+			[&cursor_hash] (const Dir_entry& dir_ent)
+			{
+				return (hash_value(dir_ent.path) == cursor_hash);
+			});
 
 	if (cursor != m_dir_items.end())
 		set_cursor(cursor);
 	else
 		set_cursor(m_dir_items.begin());
-}
-
-List_dir::Dir_cursor List_dir::get_cursor() const
-{
-	return m_cursor;
 }
 
 void List_dir::set_path(const path& dir)
@@ -170,7 +174,7 @@ void List_dir::set_path(const path& dir)
 
 	m_path_hash = hash_value(dir);
 
-	read_directory();
+	m_implicit_cursor = read_directory();
 }
 
 } // namespace hawk

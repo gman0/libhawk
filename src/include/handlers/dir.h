@@ -57,6 +57,16 @@ namespace hawk {
 		// which will be used as a key in Tab's cursor map.
 		size_t m_path_hash;
 
+		// This flag stores the type of cursor aquisition:
+		//  * implicit (ture) - aquired as begin/end cursor
+		//  * explicit - everything else
+		//
+		// It can be used e.g. when the resulting item container
+		// is sorted (the original vector is NOT sorted) - begin()
+		// will point to a different item, thus we need a way to
+		// inform the user about this.
+		bool m_implicit_cursor;
+
 		Dir_vector m_dir_items;
 		Dir_cursor m_cursor;
 
@@ -82,17 +92,24 @@ namespace hawk {
 
 		inline bool empty() const { return m_dir_items.empty(); }
 
-		Dir_cursor get_cursor() const;
-		void set_cursor(Dir_cursor cursor);
+		Dir_cursor get_cursor() const { return m_cursor; }
+		Dir_vector::const_iterator get_const_cursor() const
+			{ return m_cursor; }
 
-		// Converts boost::filesystem::path to Dir_cursor
-		// and calls set_cursor(const Dir_cursor& cursor) afterwards.
+		void set_cursor(Dir_cursor cursor);
 		void set_cursor(const boost::filesystem::path& cursor);
 
 		virtual void set_path(const boost::filesystem::path& path);
+		void set_path(const boost::filesystem::path& path,
+			boost::system::error_code& ec) noexcept;
+
+		// (see m_implicit_cursor member)
+		inline bool implicit_cursor() const { return m_implicit_cursor; }
 
 	private:
-		void read_directory();
+		// returns true if the cursor was aquired implicity,
+		// otherwise false
+		bool read_directory();
 	};
 }
 
