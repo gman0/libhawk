@@ -20,6 +20,7 @@
 #include <boost/filesystem.hpp>
 #include <algorithm>
 #include "Tab.h"
+#include <utility>
 
 using namespace boost::filesystem;
 
@@ -114,8 +115,12 @@ void Tab::set_pwd(const path& pwd)
 {
 	if (pwd.empty()) return;
 
-	m_pwd = pwd;
-	update_paths(pwd);
+	m_pwd = canonical(pwd, m_pwd);
+
+	if (m_pwd.empty())
+		m_pwd = "/";
+
+	update_paths(m_pwd);
 	update_active_cursor();
 }
 
@@ -185,7 +190,7 @@ void Tab::build_columns(unsigned ncols)
 	add_column(m_pwd, m_list_dir_closure, ncols);
 	for (int i = ncols - 1; i >= 0; i--)
 	{
-		p = p.parent_path();
+		p = std::move(p.parent_path());
 		add_column(p, m_list_dir_closure, i);
 	}
 
@@ -213,7 +218,7 @@ void Tab::update_paths(path pwd)
 	m_columns[ncols].set_path(pwd);
 	for (int i = ncols - 1; i >= 0; i--)
 	{
-		pwd = pwd.parent_path();
+		pwd = std::move(pwd.parent_path());
 		m_columns[i].set_path(pwd);
 	}
 }
@@ -225,8 +230,6 @@ void Tab::remove_column()
 		return;
 
 	m_columns.erase(m_columns.begin());
-
-	// update_paths(m_pwd);
 }
 
 void Tab::add_column(const path& pwd)
