@@ -58,7 +58,7 @@ namespace hawk {
 		size_t m_path_hash;
 
 		// This flag stores the type of cursor aquisition:
-		//  * implicit (ture) - aquired as begin/end cursor
+		//  * implicit (true) - aquired as begin/end cursor
 		//  * explicit - everything else
 		//
 		// It can be used e.g. when the resulting item container
