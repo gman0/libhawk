@@ -77,6 +77,8 @@ namespace hawk {
 
 		const boost::filesystem::path& get_pwd() const;
 		void set_pwd(const boost::filesystem::path& pwd);
+		void set_pwd(const boost::filesystem::path& pwd,
+			boost::system::error_code& ec) noexcept;
 
 		void add_column(const boost::filesystem::path& pwd);
 		void remove_column();
@@ -90,6 +92,8 @@ namespace hawk {
 
 		List_dir::Dir_cursor get_begin_cursor() const;
 		void set_cursor(List_dir::Dir_cursor cursor);
+		void set_cursor(List_dir::Dir_cursor cursor,
+			boost::system::error_code& ec) noexcept;
 
 		// Tries to find a cursor with key cursor_hash.
 		// Returns true on success (that is result != m_cursor_map.end()).

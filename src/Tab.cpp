@@ -22,6 +22,7 @@
 #include "Tab.h"
 #include <utility>
 
+#include <iostream>
 using namespace boost::filesystem;
 
 namespace hawk {
@@ -124,6 +125,18 @@ void Tab::set_pwd(const path& pwd)
 	update_active_cursor();
 }
 
+void Tab::set_pwd(const path& pwd,
+	boost::system::error_code& ec) noexcept
+{
+	try {
+		set_pwd(pwd);
+	}
+	catch (const boost::filesystem::filesystem_error& e)
+	{
+		ec = e.code();
+	}
+}
+
 Tab::Column_vector& Tab::get_columns()
 {
 	return m_columns;
@@ -178,6 +191,21 @@ void Tab::set_cursor(List_dir::Dir_cursor cursor)
 		add_column(cursor->path, closure);
 		m_columns.back()._ready();
 		m_has_preview = true;
+	}
+}
+
+void Tab::set_cursor(List_dir::Dir_cursor cursor,
+	boost::system::error_code& ec) noexcept
+{
+	try
+	{
+		set_cursor(cursor);
+	}
+	catch (const filesystem_error& e)
+	{
+		ec = e.code();
+		m_columns.erase(--m_columns.end());
+		m_has_preview = false;
 	}
 }
 
