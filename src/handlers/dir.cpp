@@ -127,15 +127,12 @@ bool List_dir::read_directory()
 void List_dir::set_cursor(List_dir::Dir_cursor cursor)
 {
 	m_cursor = std::move(cursor);
-	size_t cursor_hash;
 
 	if (m_dir_items.empty())
-		cursor_hash = 0;
-	else
-		cursor_hash = hash_value(m_cursor->path);
+            return;
 
-	m_parent_column->get_parent_tab()
-		->store_cursor(m_path_hash, cursor_hash);
+        m_parent_column->get_parent_tab()
+            ->store_cursor(m_path_hash, hash_value(m_cursor->path));
 
 	m_implicit_cursor = false;
 }
