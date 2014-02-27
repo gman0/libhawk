@@ -1,5 +1,5 @@
 /*
-	Copyright (C) 2013 Róbert "gman" Vašek <gman@codefreax.org>
+	Copyright (C) 2013-2014 Róbert "gman" Vašek <gman@codefreax.org>
 
 	This file is part of libhawk.
 
@@ -34,7 +34,7 @@ Type_factory::Magic_guard::Magic_guard()
 {
 	magic_cookie = magic_open(MAGIC_MIME_TYPE
 							// follow the symlinks
-							| MAGIC_SYMLINK 
+							| MAGIC_SYMLINK
 							// don't look for known tokens in ASCII files
 							| MAGIC_NO_CHECK_TOKENS);
 	magic_load(magic_cookie, nullptr);
@@ -66,7 +66,11 @@ void Type_factory::register_type(size_t type,
 Type_factory::Type_product Type_factory::operator[](size_t type)
 {
 	auto it = std::find_if(m_types.begin(), m_types.end(),
-		[&type](const Type_map::value_type& v){ return find_predicate(v, type); });
+		[&type](const Type_map::value_type& v)
+		{
+			return find_predicate(v, type);
+		}
+	);
 
 	if (it == m_types.end())
 		return Type_product {nullptr};
@@ -98,6 +102,7 @@ size_t Type_factory::get_hash_type(const path& p)
 	// check only for the category
 	static std::string mime;
 	mime = get_mime(p);
+
 	return calculate_mime_hash(mime);
 }
 

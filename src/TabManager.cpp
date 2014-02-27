@@ -1,5 +1,5 @@
 /*
-	Copyright (C) 2013 Róbert "gman" Vašek <gman@codefreax.org>
+	Copyright (C) 2013-2014 Róbert "gman" Vašek <gman@codefreax.org>
 
 	This file is part of libhawk.
 
@@ -62,7 +62,8 @@ Tab_manager::Tab_iterator& Tab_manager::add_tab()
 	return (m_active_tab = --m_tabs.end());
 }
 
-Tab_manager::Tab_iterator& Tab_manager::add_tab(const boost::filesystem::path& pwd)
+Tab_manager::Tab_iterator& Tab_manager::add_tab(
+		const boost::filesystem::path& pwd)
 {
 	m_tabs.push_back({pwd, m_ncols, m_type_factory, m_list_dir_closure});
 	return (m_active_tab = --m_tabs.end());
@@ -70,7 +71,8 @@ Tab_manager::Tab_iterator& Tab_manager::add_tab(const boost::filesystem::path& p
 
 Tab_manager::Tab_iterator& Tab_manager::add_tab(boost::filesystem::path&& pwd)
 {
-	m_tabs.push_back({std::move(pwd), m_ncols, m_type_factory, m_list_dir_closure});
+	m_tabs.push_back(
+			{std::move(pwd), m_ncols, m_type_factory, m_list_dir_closure});
 	return (m_active_tab = --m_tabs.end());
 }
 

@@ -1,5 +1,5 @@
 /*
-	Copyright (C) 2013 Róbert "gman" Vašek <gman@codefreax.org>
+	Copyright (C) 2013-2014 Róbert "gman" Vašek <gman@codefreax.org>
 
 	This file is part of libhawk.
 
@@ -124,24 +124,8 @@ namespace hawk {
 			m_active_column = &(m_columns.back());
 		}
 
-		inline List_dir* get_list_dir_handler(Handler* handler)
-		{
-			if (handler->get_type() != get_handler_hash<List_dir>())
-			{
-				throw std::logic_error
-					{ "Attempt to cast a non-List_dir handler to List_dir" };
-			}
-
-			return static_cast<List_dir*>(handler);
-		}
-
-		inline const boost::filesystem::path* get_last_column_path() const
-		{
-			if (m_columns.empty())
-				return nullptr;
-			else
-				return &(m_columns.back().get_path());
-		}
+		List_dir* get_list_dir_handler(Handler* handler);
+		inline const boost::filesystem::path* get_last_column_path() const;
 
 		void update_active_cursor();
 

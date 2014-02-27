@@ -1,5 +1,5 @@
 /*
-	Copyright (C) 2013 Róbert "gman" Vašek <gman@codefreax.org>
+	Copyright (C) 2013-2014 Róbert "gman" Vašek <gman@codefreax.org>
 
 	This file is part of libhawk.
 
@@ -21,9 +21,6 @@
 #include <algorithm>
 #include "Tab.h"
 #include <utility>
-
-#include <iostream>
-using namespace boost::filesystem;
 
 namespace hawk {
 
@@ -307,6 +304,25 @@ void Tab::update_cols_tab_ptr()
 {
 	for (auto& col : m_columns)
 		col._set_parent_tab(this);
+}
+
+List_dir* Tab::get_list_dir_handler(Handler* handler)
+{
+	if (handler->get_type() != get_handler_hash<List_dir>())
+	{
+		throw std::logic_error
+			{ "Attempt to cast a non-List_dir handler to List_dir" };
+	}
+
+	return static_cast<List_dir*>(handler);
+}
+
+const boost::filesystem::path* Tab::get_last_column_path() const
+{
+	if (m_columns.empty())
+		return nullptr;
+	else
+		return &(m_columns.back().get_path());
 }
 
 } // namespace hawk

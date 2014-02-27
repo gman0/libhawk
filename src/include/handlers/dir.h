@@ -1,5 +1,5 @@
 /*
-	Copyright (C) 2013 Róbert "gman" Vašek <gman@codefreax.org>
+	Copyright (C) 2013-2014 Róbert "gman" Vašek <gman@codefreax.org>
 
 	This file is part of libhawk.
 

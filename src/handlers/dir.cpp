@@ -1,5 +1,5 @@
 /*
-	Copyright (C) 2013 Róbert "gman" Vašek <gman@codefreax.org>
+	Copyright (C) 2013-2014 Róbert "gman" Vašek <gman@codefreax.org>
 
 	This file is part of libhawk.
 
@@ -105,7 +105,9 @@ bool List_dir::read_directory()
 			Dir_cursor cursor =
 				std::find_if(m_dir_items.begin(), m_dir_items.end(),
 					[cursor_hash](const Dir_entry& item)
-					{ return (hash_value(item.path) == cursor_hash); }
+					{
+						return (hash_value(item.path) == cursor_hash);
+					}
 				);
 
 			if (cursor != m_dir_items.end())
@@ -146,7 +148,8 @@ void List_dir::set_cursor(const path& cur)
 			[&cursor_hash] (const Dir_entry& dir_ent)
 			{
 				return (hash_value(dir_ent.path) == cursor_hash);
-			});
+			}
+		);
 
 	if (cursor != m_dir_items.end())
 		set_cursor(cursor);
