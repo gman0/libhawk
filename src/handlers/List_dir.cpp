@@ -24,8 +24,8 @@
 #include <boost/functional/hash.hpp>
 // ^ this resolves an undefined reference to boost::hash_range<>
 
-#include "handlers/dir.h"
-#include "handlers/dir_hash.h"
+#include "handlers/List_dir.h"
+#include "handlers/List_dir_hash.h"
 
 #include "Tab.h"
 #include "Column.h"

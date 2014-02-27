@@ -25,9 +25,9 @@
 #include <utility>
 #include <exception>
 #include "Column.h"
-#include "TypeFactory.h"
-#include "handlers/dir.h"
-#include "handlers/dir_hash_extern.h"
+#include "Type_factory.h"
+#include "handlers/List_dir.h"
+#include "handlers/List_dir_hash_extern.h"
 
 namespace hawk {
 	class Type_factory;

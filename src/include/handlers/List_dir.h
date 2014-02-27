@@ -27,7 +27,7 @@
 #include <boost/filesystem.hpp>
 #include <unordered_map>
 #include "Handler.h"
-#include "NoHash.h"
+#include "No_hash.h"
 
 namespace hawk {
 	class Column;

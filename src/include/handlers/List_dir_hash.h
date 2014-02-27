@@ -21,7 +21,7 @@
 #define HAWK_LIST_DIR_HASH_H
 
 #include <functional>
-#include "handlers/dir.h"
+#include "handlers/List_dir.h"
 #include "handlers/hash.h"
 #include "calchash.h"
 

@@ -20,7 +20,7 @@
 #include <algorithm>
 #include <exception>
 #include <string>
-#include "TypeFactory.h"
+#include "Type_factory.h"
 #include "Handler.h"
 #include "calchash.h"
 

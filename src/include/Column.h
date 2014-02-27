@@ -24,7 +24,7 @@
 #include <utility>
 #include <vector>
 #include "Handler.h"
-#include "handlers/dir.h"
+#include "handlers/List_dir.h"
 
 namespace hawk {
 	class Tab;

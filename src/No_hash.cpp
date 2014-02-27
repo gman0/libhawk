@@ -18,7 +18,7 @@
 */
 
 #include <cstddef>
-#include "NoHash.h"
+#include "No_hash.h"
 
 std::size_t hawk::No_hash::operator()(const size_t& key) const
 {

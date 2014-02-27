@@ -26,7 +26,7 @@
 #include <utility>
 #include <boost/filesystem/path.hpp>
 #include <magic.h>
-#include "NoHash.h"
+#include "No_hash.h"
 #include "Column.h"
 
 namespace hawk {

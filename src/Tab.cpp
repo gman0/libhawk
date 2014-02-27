@@ -19,8 +19,10 @@
 
 #include <boost/filesystem.hpp>
 #include <algorithm>
-#include "Tab.h"
 #include <utility>
+#include "Tab.h"
+
+using namespace boost::filesystem;
 
 namespace hawk {
 

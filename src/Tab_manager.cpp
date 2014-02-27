@@ -19,8 +19,8 @@
 
 #include <utility>
 #include <exception>
-#include "TabManager.h"
-#include "handlers/dir_hash_extern.h"
+#include "Tab_manager.h"
+#include "handlers/List_dir_hash_extern.h"
 
 namespace hawk {
 
