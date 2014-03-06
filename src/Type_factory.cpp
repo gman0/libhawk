@@ -99,9 +99,13 @@ const char* Type_factory::get_mime(const path& p)
 
 size_t Type_factory::get_hash_type(const path& p)
 {
-	// check only for the category
 	static std::string mime;
-	mime = get_mime(p);
+	const char* m = get_mime(p);
+
+	if (m == nullptr)
+		return 0;
+
+	mime = m;
 
 	return calculate_mime_hash(mime);
 }
