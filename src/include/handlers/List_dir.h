@@ -110,6 +110,8 @@ namespace hawk {
 		// returns true if the cursor was aquired implicity,
 		// otherwise false
 		bool read_directory();
+
+		Dir_cursor match_cursor(size_t match_hash);
 	};
 }
 
