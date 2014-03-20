@@ -100,16 +100,8 @@ bool List_dir::read_directory()
 			// ok, so we DID find the hash of the cursor,
 			// now let's assign it to the correct Dir_vector
 			// item if we can
-			size_t cursor_hash = cursor_hash_it->second;
-
-			Dir_cursor cursor =
-				std::find_if(m_dir_items.begin(), m_dir_items.end(),
-					[cursor_hash](const Dir_entry& item)
-					{
-						return (hash_value(item.path) == cursor_hash);
-					}
-				);
-
+			Dir_cursor cursor = match_cursor(cursor_hash_it->second);
+	
 			if (cursor != m_dir_items.end())
 			{
 				m_cursor = cursor;
@@ -141,15 +133,7 @@ void List_dir::set_cursor(List_dir::Dir_cursor cursor)
 
 void List_dir::set_cursor(const path& cur)
 {
-	size_t cursor_hash = hash_value(cur);
-
-	Dir_cursor cursor =
-		std::find_if(m_dir_items.begin(), m_dir_items.end(),
-			[&cursor_hash] (const Dir_entry& dir_ent)
-			{
-				return (hash_value(dir_ent.path) == cursor_hash);
-			}
-		);
+	Dir_cursor cursor = match_cursor(hash_value(cur));
 
 	if (cursor != m_dir_items.end())
 		set_cursor(cursor);
@@ -171,13 +155,23 @@ void List_dir::set_path(const path& dir)
 
 	if (!is_directory(dir))
 	{
-		throw std::runtime_error
-			{ std::string {"\""} + dir.c_str() + "\" is not a directory" };
+		throw boost::filesystem::filesystem_error
+			{ dir.native(), boost::system::errc::make_error_code(
+				boost::system::errc::not_a_directory) };
 	}
 
 	m_path_hash = hash_value(dir);
 
 	m_implicit_cursor = read_directory();
+}
+
+List_dir::Dir_cursor List_dir::match_cursor(size_t match_hash)
+{
+	return std::find_if(m_dir_items.begin(), m_dir_items.end(),
+				[match_hash](const Dir_entry& dir_ent)
+				{
+					return (hash_value(dir_ent.path) == match_hash);
+				});
 }
 
 } // namespace hawk
