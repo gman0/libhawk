@@ -111,17 +111,19 @@ const path& Tab::get_pwd() const
 	return m_pwd;
 }
 
-void Tab::set_pwd(const path& pwd)
+void Tab::set_pwd(path pwd)
 {
 	if (pwd.empty()) return;
 
-	m_pwd = canonical(pwd, m_pwd);
+	pwd = canonical(pwd, m_pwd);
 
-	if (m_pwd.empty())
-		m_pwd = "/";
+	if (pwd.empty())
+		pwd = "/";
 
-	update_paths(m_pwd);
+	update_paths(pwd);
 	update_active_cursor();
+
+	m_pwd = std::move(pwd);
 }
 
 void Tab::set_pwd(const path& pwd,

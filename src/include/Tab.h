@@ -76,7 +76,7 @@ namespace hawk {
 		Tab& operator=(Tab&& t);
 
 		const boost::filesystem::path& get_pwd() const;
-		void set_pwd(const boost::filesystem::path& pwd);
+		void set_pwd(boost::filesystem::path pwd);
 		void set_pwd(const boost::filesystem::path& pwd,
 			boost::system::error_code& ec) noexcept;
 
