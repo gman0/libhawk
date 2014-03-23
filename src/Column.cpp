@@ -92,8 +92,8 @@ const path* Column::get_child_path() const
 
 void Column::set_path(const path& p)
 {
+	m_handler->set_path(p);
 	m_path = p;
-	m_handler->set_path(m_path);
 }
 
 void Column::set_path(path&& p)
