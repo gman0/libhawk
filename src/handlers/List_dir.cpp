@@ -73,7 +73,9 @@ bool List_dir::read_directory()
 	{
 		Dir_entry dir_ent;
 		dir_ent.path = std::move(*dir_it);
-		dir_ent.status = status(dir_ent.path);
+
+		boost::system::error_code ec;
+		dir_ent.status = status(dir_ent.path, ec);
 
 		m_dir_items.push_back(std::move(dir_ent));
 	}
@@ -123,7 +125,7 @@ void List_dir::set_cursor(List_dir::Dir_cursor cursor)
 	m_cursor = std::move(cursor);
 
 	if (m_dir_items.empty())
-            return;
+		return;
 
         m_parent_column->get_parent_tab()
             ->store_cursor(m_path_hash, hash_value(m_cursor->path));
@@ -143,10 +145,9 @@ void List_dir::set_cursor(const path& cur)
 
 void List_dir::set_path(const path& dir)
 {
-	Handler::set_path(dir);
-
 	if (dir.empty())
 	{
+		m_path = nullptr;
 		m_dir_items.clear();
 		m_path_hash = 0;
 
@@ -160,6 +161,14 @@ void List_dir::set_path(const path& dir)
 				boost::system::errc::not_a_directory) };
 	}
 
+	if (access(dir.c_str(), R_OK) == -1)
+	{
+		throw boost::filesystem::filesystem_error
+			{ dir.native(), boost::system::errc::make_error_code(
+					boost::system::errc::permission_denied) };
+	}
+
+	Handler::set_path(dir);
 	m_path_hash = hash_value(dir);
 
 	m_implicit_cursor = read_directory();
