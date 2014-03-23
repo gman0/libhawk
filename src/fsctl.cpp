@@ -57,4 +57,4 @@ void rename(const path& old_p, const path& new_p, Tab* tab,
 	}
 }
 
-}
+} // namespace hawk
