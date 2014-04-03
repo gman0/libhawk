@@ -166,7 +166,7 @@ void Tab::set_cursor(List_dir::Dir_cursor cursor)
 	// remove current preview column (if any)
 	if (m_has_preview)
 	{
-		m_columns.erase(--m_columns.end());
+		m_columns.pop_back();
 		m_has_preview = false;
 	}
 
