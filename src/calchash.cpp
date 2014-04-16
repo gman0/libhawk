@@ -18,7 +18,6 @@
 */
 
 #include <cstring>
-#include <bitset>
 #include "calchash.h"
 
 namespace hawk {

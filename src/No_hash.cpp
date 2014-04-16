@@ -20,7 +20,11 @@
 #include <cstddef>
 #include "No_hash.h"
 
-std::size_t hawk::No_hash::operator()(const size_t& key) const
+namespace hawk {
+
+std::size_t No_hash::operator()(const size_t& key) const
 {
 	return key;
 }
+
+} // namespace hawk

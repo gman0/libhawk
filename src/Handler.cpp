@@ -20,27 +20,26 @@
 #include <functional>
 #include "Handler.h"
 
-using namespace std;
 using namespace boost::filesystem;
 
 namespace hawk {
 
 Handler::Handler(const path& p, Column* parent_column,
-	const string& type)
+	const std::string& type)
 	:
 	m_path{&p},
 	m_parent_column{parent_column}
 {
-	m_type = hash<string>()(type);
+	m_type = std::hash<std::string>()(type);
 }
 
 Handler::Handler(Column* parent_column,
-	const string& type)
+	const std::string& type)
 	:
 	m_path{},
 	m_parent_column{parent_column}
 {
-	m_type = hash<string>()(type);
+	m_type = std::hash<std::string>()(type);
 }
 
 size_t Handler::get_type() const

@@ -19,7 +19,6 @@
 
 #include <algorithm>
 #include <exception>
-#include <string>
 #include "Type_factory.h"
 #include "Handler.h"
 #include "calchash.h"
