@@ -90,6 +90,12 @@ namespace hawk {
 		const Column* get_active_column() const { return m_active_column; }
 		size_t get_current_ncols(); // don't confuse this with the size of column vector
 
+		// Get List_dir handler of the active column.
+		List_dir* get_active_ld()
+		{
+			return static_cast<List_dir*>(m_active_column->get_handler());
+		}
+
 		List_dir::Dir_cursor get_begin_cursor() const;
 		void set_cursor(List_dir::Dir_cursor cursor);
 		void set_cursor(List_dir::Dir_cursor cursor,
@@ -124,7 +130,6 @@ namespace hawk {
 			m_active_column = &(m_columns.back());
 		}
 
-		List_dir* get_list_dir_handler(Handler* handler);
 		inline const boost::filesystem::path* get_last_column_path() const;
 
 		void update_active_cursor();

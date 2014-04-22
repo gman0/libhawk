@@ -173,8 +173,7 @@ void Tab::set_cursor(List_dir::Dir_cursor cursor)
 	// reset the active column
 	activate_last_column();
 
-	List_dir* ld =
-		get_list_dir_handler(m_active_column->get_handler());
+	List_dir* ld = get_active_ld();
 
 	if (ld->empty())
 		return;
@@ -308,17 +307,6 @@ void Tab::update_cols_tab_ptr()
 {
 	for (auto& col : m_columns)
 		col._set_parent_tab(this);
-}
-
-List_dir* Tab::get_list_dir_handler(Handler* handler)
-{
-	if (handler->get_type() != get_handler_hash<List_dir>())
-	{
-		throw std::logic_error
-			{ "Attempt to cast a non-List_dir handler to List_dir" };
-	}
-
-	return static_cast<List_dir*>(handler);
 }
 
 const boost::filesystem::path* Tab::get_last_column_path() const
