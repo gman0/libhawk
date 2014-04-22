@@ -32,6 +32,49 @@ void rename(const boost::filesystem::path& old_p,
 	const boost::filesystem::path& new_p, Tab* tab,
 	boost::system::error_code& ec) noexcept;
 
-}
+// Note that it's front-end's responsibility dest move the cursor after
+// removing a file/directory.
+// XXX: WORK IN PROGRESS!
+bool remove(const boost::filesystem::path& p);
+bool remove(const boost::filesystem::path&,
+	boost::system::error_code& ec) noexcept;
+// XXX: WORK IN PROGRESS!
+uintmax_t remove_all(const boost::filesystem::path& p);
+uintmax_t remove_all(const boost::filesystem::path& p,
+	boost::system::error_code& ec) noexcept;
+
+// XXX: WORK IN PROGRESS!
+void copy(const boost::filesystem::path& src,
+	const boost::filesystem::path& dest);
+void copy(const boost::filesystem::path& src,
+	const boost::filesystem::path& dest, boost::system::error_code& ec) noexcept;
+
+// XXX: WORK IN PROGRESS!
+void move(const boost::filesystem::path& src,
+	const boost::filesystem::path& dest);
+void move(const boost::filesystem::path& src,
+	const boost::filesystem::path& dest,
+	boost::system::error_code& ec) noexcept;
+
+void create_directory(const boost::filesystem::path& p);
+void create_directory(const boost::filesystem::path& p,
+	boost::system::error_code& ec) noexcept;
+void create_directories(const boost::filesystem::path& p);
+void create_directories(const boost::filesystem::path& p,
+	boost::system::error_code& ec) noexcept;
+
+void create_symlink(const boost::filesystem::path& dest,
+	const boost::filesystem::path& new_symlink);
+void create_symlink(const boost::filesystem::path& dest,
+	const boost::filesystem::path& new_symlink,
+	boost::system::error_code& ec) noexcept;
+
+void create_hard_link(const boost::filesystem::path& dest,
+	const boost::filesystem::path& new_hard_link);
+void create_hard_link(const boost::filesystem::path& dest,
+	const boost::filesystem::path& new_hard_link,
+	boost::system::error_code& ec) noexcept;
+
+} // namespace hawk
 
 #endif // FS_CTL_H
