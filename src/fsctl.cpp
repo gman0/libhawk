@@ -17,8 +17,6 @@
 	along with libhawk.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#define BOOST_NO_CXX11_SCOPED_ENUMS
-
 #include <boost/functional/hash.hpp>
 #include "Tab.h"
 #include "fsctl.h"
