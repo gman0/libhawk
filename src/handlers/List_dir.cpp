@@ -28,6 +28,7 @@
 #include "handlers/List_dir_hash.h"
 
 #include "Tab.h"
+#include "Cursor_cache.h"
 #include "Column.h"
 
 using namespace boost::filesystem;
@@ -37,18 +38,24 @@ constexpr int cache_threshold = 1024;
 namespace hawk {
 
 List_dir::List_dir(const boost::filesystem::path& path,
-	Column* parent_column)
+	Column* parent_column,
+	std::shared_ptr<Cursor_cache>& cc)
 	:
-	Handler{path, parent_column},
-	m_path_hash{},
-	m_implicit_cursor{true}
+	  Handler{path, parent_column},
+	  m_cursor_cache{cc},
+	  m_path_hash{0},
+	  m_implicit_cursor{true}
 {
 	set_path(path);
 }
 
 List_dir& List_dir::operator=(List_dir&& ld) noexcept
 {
+	if (this == &ld)
+		return *this;
+
 	Handler::operator=(std::move(ld));
+	m_cursor_cache = std::move(ld.m_cursor_cache);
 	m_path_hash = ld.m_path_hash;
 	m_dir_items = std::move(ld.m_dir_items);
 	m_cursor = std::move(ld.m_cursor);
@@ -94,10 +101,9 @@ bool List_dir::read_directory()
 	{
 		// try to retrieve the last used cursor
 
-		Tab* tab = m_parent_column->get_parent_tab();
-		List_dir::Cursor_map::iterator cursor_hash_it;
+		Cursor_cache::Cursor cursor_hash_it;
 
-		if (tab->find_cursor(m_path_hash, cursor_hash_it))
+		if (m_cursor_cache->find(m_path_hash, cursor_hash_it))
 		{
 			// ok, so we DID find the hash of the cursor,
 			// now let's assign it to the correct Dir_vector
@@ -127,9 +133,7 @@ void List_dir::set_cursor(List_dir::Dir_cursor cursor)
 	if (m_dir_items.empty())
 		return;
 
-		m_parent_column->get_parent_tab()
-			->store_cursor(m_path_hash, hash_value(m_cursor->path));
-
+	m_cursor_cache->store(m_path_hash, hash_value(m_cursor->path));
 	m_implicit_cursor = false;
 }
 

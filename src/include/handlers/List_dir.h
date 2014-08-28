@@ -24,13 +24,14 @@
 #include <string>
 #include <ctime>
 #include <utility>
+#include <memory>
 #include <boost/filesystem.hpp>
-#include <unordered_map>
 #include "Handler.h"
 #include "No_hash.h"
 
 namespace hawk {
 	class Column;
+	class Cursor_cache;
 
 	class List_dir : public Handler
 	{
@@ -45,16 +46,11 @@ namespace hawk {
 		using Dir_vector = std::vector<Dir_entry>;
 		using Dir_cursor = Dir_vector::iterator;
 
-		// The first size_t is the hash of the path to which
-		// the cursor belongs to (key) and the second size_t
-		// is the item in the directory to which the cursor
-		// points to.
-		using Cursor_map =
-			std::unordered_map<size_t, size_t, No_hash>;
-
 	private:
+		std::shared_ptr<Cursor_cache> m_cursor_cache;
+
 		// This will hold the hash value of current path
-		// which will be used as a key in Tab's cursor map.
+		// which will be used as a key in m_cursor_cache.
 		size_t m_path_hash;
 
 		// This flag stores the type of cursor aquisition:
@@ -72,7 +68,7 @@ namespace hawk {
 
 	public:
 		List_dir(const boost::filesystem::path& path,
-			Column* parent_column);
+			Column* parent_column, std::shared_ptr<Cursor_cache>& cc);
 		List_dir(const List_dir&) = delete;
 
 		List_dir(List_dir&& ld) noexcept
@@ -87,8 +83,7 @@ namespace hawk {
 
 		// Get a reference to the vector of current directory's contents.
 		Dir_vector& get_contents() { return m_dir_items; }
-		const Dir_vector& get_contents() const
-			{ return m_dir_items; }
+		const Dir_vector& get_contents() const { return m_dir_items; }
 
 		inline bool empty() const { return m_dir_items.empty(); }
 
@@ -107,8 +102,8 @@ namespace hawk {
 		inline bool implicit_cursor() const { return m_implicit_cursor; }
 
 	private:
-		// returns true if the cursor was aquired implicity,
-		// otherwise false
+		// Returns true if the cursor was aquired implicity,
+		// otherwise false.
 		bool read_directory();
 
 		Dir_cursor match_cursor(size_t match_hash);
