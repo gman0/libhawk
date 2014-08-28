@@ -34,6 +34,8 @@ namespace hawk {
 		using Map =
 			std::unordered_map<size_t, size_t, No_hash>;
 
+		using Cursor = Map::iterator;
+
 	private:
 		Map m_cursor_map;
 
@@ -41,14 +43,8 @@ namespace hawk {
 		// Tries to find a cursor with key cursor_hash.
 		// Returns true on success (that is result != m_cursor_map.end()).
 		// The resulting find iterator is stored in iter.
-		template <class Iterator>
-		bool find_cursor(size_t cursor_hash, Iterator& iter)
-		{
-			iter = m_cursor_map.find(cursor_hash);
-			return (iter != m_cursor_map.end());
-		}
-
-		void store_cursor(size_t key, size_t cursor_hash);
+		bool find(size_t cursor_hash, Cursor& iter);
+		void store(size_t key, size_t cursor_hash);
 	};
 }
 

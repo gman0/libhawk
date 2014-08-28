@@ -21,7 +21,13 @@
 
 namespace hawk {
 
-void Cursor_cache::store_cursor(size_t key, size_t cursor_hash)
+bool Cursor_cache::find(size_t cursor_hash, Cursor_cache::Cursor& iter)
+{
+	iter = m_cursor_map.find(cursor_hash);
+	return (iter != m_cursor_map.end());
+}
+
+void Cursor_cache::store(size_t key, size_t cursor_hash)
 {
 	m_cursor_map[key] = cursor_hash;
 }
