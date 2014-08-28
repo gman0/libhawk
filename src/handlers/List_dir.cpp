@@ -37,6 +37,24 @@ constexpr int cache_threshold = 1024;
 
 namespace hawk {
 
+// Gather contents of a directory and move them to the out vector
+static void gather_dir_contents(const path& p, List_dir::Dir_vector& out)
+{
+	directory_iterator dir_it_end;
+	for (auto dir_it = directory_iterator {p};
+		 dir_it != dir_it_end;
+		 ++dir_it)
+	{
+		List_dir::Dir_entry dir_ent;
+		dir_ent.path = std::move(*dir_it);
+
+		boost::system::error_code ec;
+		dir_ent.status = status(dir_ent.path, ec);
+
+		out.push_back(std::move(dir_ent));
+	}
+}
+
 List_dir::List_dir(const boost::filesystem::path& path,
 	Column* parent_column,
 	std::shared_ptr<Cursor_cache>& cc)
@@ -68,30 +86,19 @@ bool List_dir::read_directory()
 {
 	m_dir_items.clear();
 
-	// free up some space if we need to
+	// Free up some space if we need to.
 	if (m_dir_items.size() > cache_threshold)
 		m_dir_items.resize(cache_threshold);
 
-	// gather the directory contents and move them to the vector
-	directory_iterator dir_it_end;
-	for (auto dir_it = directory_iterator {*m_path};
-		 dir_it != dir_it_end;
-		 ++dir_it)
-	{
-		Dir_entry dir_ent;
-		dir_ent.path = std::move(*dir_it);
+	gather_dir_contents(*m_path, m_dir_items);
 
-		boost::system::error_code ec;
-		dir_ent.status = status(dir_ent.path, ec);
-
-		m_dir_items.push_back(std::move(dir_ent));
-	}
-
+	//
 	// set the cursor
+	//
 
 	const path* child_path = m_parent_column->get_child_path();
 
-	// do we have a child path (i.e. child column)?
+	// Do we have a child path (i.e. child column)?
 	if (child_path)
 	{
 		set_cursor(*child_path);
@@ -99,15 +106,14 @@ bool List_dir::read_directory()
 	}
 	else
 	{
-		// try to retrieve the last used cursor
+		// Try to retrieve the last used cursor.
 
 		Cursor_cache::Cursor cursor_hash_it;
-
 		if (m_cursor_cache->find(m_path_hash, cursor_hash_it))
 		{
-			// ok, so we DID find the hash of the cursor,
+			// Ok, so we DID find the hash of the cursor,
 			// now let's assign it to the correct Dir_vector
-			// item if we can
+			// item if we can.
 			Dir_cursor cursor = match_cursor(cursor_hash_it->second);
 
 			if (cursor != m_dir_items.end())
@@ -117,9 +123,9 @@ bool List_dir::read_directory()
 			}
 		}
 
-		// we didn't find the cursor, let's use the first
+		// We didn't find the cursor, let's use the first
 		// item of our Dir_vector as the cursor (or the
-		// end() iterator if the vector is empty)
+		// end() iterator if the vector is empty).
 		m_cursor = m_dir_items.begin();
 	}
 
