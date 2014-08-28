@@ -27,8 +27,6 @@
 #include "handlers/List_dir.h"
 
 namespace hawk {
-	class Tab;
-
 	class Column
 	{
 	private:
@@ -37,29 +35,23 @@ namespace hawk {
 									Column*)>;
 
 		boost::filesystem::path m_path;
+		const Column* m_child_column;
 
 		std::shared_ptr<Handler> m_handler;
 		Type_product m_handler_closure;
 
-		const Column* m_child_column;
-		Tab* m_parent_tab;
-
 	public:
-		Column()
-			:
-			m_child_column{},
-			m_parent_tab{}
+		Column() : m_child_column{}
 		{}
 
 		Column(const boost::filesystem::path& path,
-			const Type_product& tp, Tab* parent_tab);
+			const Type_product& tp);
 		Column(boost::filesystem::path&& path,
-			const Type_product& tp, Tab* parent_tab);
+			const Type_product& tp);
 
 		// for internal/expert use only
 		void _ready();
 		void _set_child_column(const Column* child_column);
-		void _set_parent_tab(Tab* tab);
 
 		Handler* get_handler();
 		const Handler* get_handler() const;
@@ -69,7 +61,6 @@ namespace hawk {
 		void set_path(boost::filesystem::path&& path);
 
 		const boost::filesystem::path* get_child_path() const;
-		Tab* get_parent_tab() { return m_parent_tab; }
 	};
 }
 
