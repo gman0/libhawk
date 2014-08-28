@@ -50,29 +50,24 @@ void Tab_manager::set_active_tab(Tab_manager::Tab_iterator&& tab)
 	m_active_tab = std::move(tab);
 }
 
-Tab& Tab_manager::get_tabref(int tab)
-{
-	return m_tabs[tab];
-}
-
 Tab_manager::Tab_iterator& Tab_manager::add_tab()
 {
-	m_tabs.push_back({m_active_tab->get_pwd(), m_ncols,
-						m_type_factory, m_list_dir_closure});
+	m_tabs.emplace_back(m_active_tab->get_pwd(), m_ncols,
+						m_type_factory, m_list_dir_closure);
 	return (m_active_tab = --m_tabs.end());
 }
 
 Tab_manager::Tab_iterator& Tab_manager::add_tab(
 		const boost::filesystem::path& pwd)
 {
-	m_tabs.push_back({pwd, m_ncols, m_type_factory, m_list_dir_closure});
+	m_tabs.emplace_back(pwd, m_ncols, m_type_factory, m_list_dir_closure);
 	return (m_active_tab = --m_tabs.end());
 }
 
 Tab_manager::Tab_iterator& Tab_manager::add_tab(boost::filesystem::path&& pwd)
 {
-	m_tabs.push_back(
-			{std::move(pwd), m_ncols, m_type_factory, m_list_dir_closure});
+	m_tabs.emplace_back(
+			std::move(pwd), m_ncols, m_type_factory, m_list_dir_closure);
 	return (m_active_tab = --m_tabs.end());
 }
 

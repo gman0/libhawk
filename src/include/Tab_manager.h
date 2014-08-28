@@ -20,17 +20,17 @@
 #ifndef HAWK_TAB_MANAGER_H
 #define HAWK_TAB_MANAGER_H
 
-#include <vector>
+#include <list>
 #include "Tab.h"
 
 namespace hawk {
 	class Tab_manager
 	{
 	public:
-		using Tab_iterator = typename std::vector<Tab>::iterator;
+		using Tab_iterator = typename std::list<Tab>::iterator;
 
 	private:
-		std::vector<Tab> m_tabs;
+		std::list<Tab> m_tabs;
 		Tab_iterator m_active_tab;
 
 		Type_factory* m_type_factory;
@@ -47,7 +47,6 @@ namespace hawk {
 		Tab_iterator& get_active_tab();
 		void set_active_tab(Tab_iterator& tab);
 		void set_active_tab(Tab_iterator&& tab);
-		Tab& get_tabref(int tab);
 
 		Tab_iterator& add_tab();
 		Tab_iterator& add_tab(const boost::filesystem::path& pwd);
