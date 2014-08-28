@@ -39,14 +39,14 @@ namespace hawk {
 List_dir::List_dir(const boost::filesystem::path& path,
 	Column* parent_column)
 	:
-	Handler{path, parent_column, get_handler_hash<List_dir>()},
+	Handler{path, parent_column},
 	m_path_hash{},
 	m_implicit_cursor{true}
 {
 	set_path(path);
 }
 
-List_dir& List_dir::operator=(List_dir&& ld)
+List_dir& List_dir::operator=(List_dir&& ld) noexcept
 {
 	Handler::operator=(std::move(ld));
 	m_path_hash = ld.m_path_hash;
@@ -103,7 +103,7 @@ bool List_dir::read_directory()
 			// now let's assign it to the correct Dir_vector
 			// item if we can
 			Dir_cursor cursor = match_cursor(cursor_hash_it->second);
-	
+
 			if (cursor != m_dir_items.end())
 			{
 				m_cursor = cursor;
@@ -127,8 +127,8 @@ void List_dir::set_cursor(List_dir::Dir_cursor cursor)
 	if (m_dir_items.empty())
 		return;
 
-        m_parent_column->get_parent_tab()
-            ->store_cursor(m_path_hash, hash_value(m_cursor->path));
+		m_parent_column->get_parent_tab()
+			->store_cursor(m_path_hash, hash_value(m_cursor->path));
 
 	m_implicit_cursor = false;
 }

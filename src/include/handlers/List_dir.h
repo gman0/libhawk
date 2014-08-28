@@ -83,7 +83,7 @@ namespace hawk {
 			m_cursor{std::move(ld.m_cursor)}
 		{ ld.m_path_hash = 0; }
 
-		List_dir& operator=(List_dir&& ld);
+		List_dir& operator=(List_dir&& ld) noexcept;
 
 		// Get a reference to the vector of current directory's contents.
 		Dir_vector& get_contents() { return m_dir_items; }
