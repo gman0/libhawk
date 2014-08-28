@@ -16,7 +16,7 @@
 	You should have received a copy of the GNU General Public License
 	along with libhawk.  If not, see <http://www.gnu.org/licenses/>.
 */
-
+/*
 #include <boost/functional/hash.hpp>
 #include "Tab.h"
 #include "fsctl.h"
@@ -181,3 +181,4 @@ void create_hard_link(const path& src, const path& new_hard_link,
 { boost::filesystem::create_hard_link(src, new_hard_link, ec); }
 
 } // namespace hawk
+*/
