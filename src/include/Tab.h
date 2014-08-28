@@ -70,10 +70,10 @@ namespace hawk {
 			Type_factory* tf,
 			const Type_factory::Type_product& list_dir_closure);
 		Tab(const Tab& t);
-		Tab(Tab&& t);
+		Tab(Tab&& t) noexcept;
 
 		Tab& operator=(const Tab& t);
-		Tab& operator=(Tab&& t);
+		Tab& operator=(Tab&& t) noexcept;
 
 		const boost::filesystem::path& get_pwd() const;
 		void set_pwd(boost::filesystem::path pwd);

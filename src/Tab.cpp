@@ -65,7 +65,7 @@ Tab::Tab(const Tab& t)
 	update_cols_tab_ptr();
 }
 
-Tab::Tab(Tab&& t)
+Tab::Tab(Tab&& t) noexcept
 	:
 	m_pwd{std::move(t.m_pwd)},
 	m_columns{std::move(t.m_columns)},
@@ -92,7 +92,7 @@ Tab& Tab::operator=(const Tab& t)
 	return *this;
 }
 
-Tab& Tab::operator=(Tab&& t)
+Tab& Tab::operator=(Tab&& t) noexcept
 {
 	m_pwd = std::move(t.m_pwd);
 	m_columns = std::move(t.m_columns);
@@ -268,13 +268,13 @@ void Tab::add_column(const path& pwd)
 void Tab::add_column(const path& pwd,
 	const Type_factory::Type_product& closure)
 {
-	m_columns.push_back({pwd, closure, this});
+	m_columns.emplace_back(pwd, closure, this);
 }
 
 void Tab::add_column(path&& pwd,
 	const Type_factory::Type_product& closure)
 {
-	m_columns.push_back({std::move(pwd), closure, this});
+	m_columns.emplace_back(std::move(pwd), closure, this);
 }
 
 void Tab::add_column(const path& pwd,
