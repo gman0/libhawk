@@ -31,46 +31,28 @@ namespace hawk {
 	{
 	protected:
 		const boost::filesystem::path* m_path;
-		size_t m_type; // hash value of type
-
 		Column* m_parent_column;
 
 	public:
 		Handler()
 			:
-			m_path{},
-			m_type{},
-			m_parent_column{}
+			  m_path{},
+			  m_parent_column{}
 		{}
 
 		// type as in the mime type
 		Handler(const boost::filesystem::path& path,
-			Column* parent_column,
-			const std::string& type);
-
-		Handler(Column* parent_column,
-			const std::string& type);
-
-		Handler(const boost::filesystem::path& path,
-			Column* parent_column,
-			size_t hash)
+			Column* parent_column)
 			:
-			m_path{&path},
-			m_type{hash},
-			m_parent_column{parent_column}
+			  m_path{&path},
+			  m_parent_column{parent_column}
 		{}
 
 		virtual ~Handler() = default;
 
-		size_t get_type() const;
-		bool operator==(const Handler& h);
-		bool operator!=(const Handler& h);
-
 		// set_path is called internally from Column
 		virtual void set_path(const boost::filesystem::path& p);
-		const boost::filesystem::path* get_path() const
-			{ return m_path; }
-
+		const boost::filesystem::path* get_path() const;
 		const Column* get_parent_column() const;
 	};
 }

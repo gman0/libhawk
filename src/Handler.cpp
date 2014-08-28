@@ -24,39 +24,6 @@ using namespace boost::filesystem;
 
 namespace hawk {
 
-Handler::Handler(const path& p, Column* parent_column,
-	const std::string& type)
-	:
-	m_path{&p},
-	m_parent_column{parent_column}
-{
-	m_type = std::hash<std::string>()(type);
-}
-
-Handler::Handler(Column* parent_column,
-	const std::string& type)
-	:
-	m_path{},
-	m_parent_column{parent_column}
-{
-	m_type = std::hash<std::string>()(type);
-}
-
-size_t Handler::get_type() const
-{
-	return m_type;
-}
-
-bool Handler::operator==(const Handler& h)
-{
-	return (m_type == h.m_type);
-}
-
-bool Handler::operator!=(const Handler& h)
-{
-	return (m_type != h.m_type);
-}
-
 void Handler::set_path(const path& p)
 {
 	m_path = &p;
