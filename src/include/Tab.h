@@ -23,9 +23,10 @@
 #include <boost/filesystem/path.hpp>
 #include <vector>
 #include <utility>
-#include <exception>
+#include <memory>
 #include "Column.h"
 #include "Type_factory.h"
+#include "Cursor_cache.h"
 #include "handlers/List_dir.h"
 #include "handlers/List_dir_hash_extern.h"
 
@@ -41,6 +42,8 @@ namespace hawk {
 		// PWD usually stands for Print Working Directory
 		// but there's no printing involved as this only
 		// holds the current working directory.
+
+		/// XXX: Rename this to m_path for consistency
 		boost::filesystem::path m_pwd;
 
 		Column_vector m_columns;
@@ -55,10 +58,9 @@ namespace hawk {
 		// there can be only one preview.
 		bool m_has_preview;
 
-		// This cursor map stores all cursors. It is shared
-		// between all List_dir handlers that exist in a
-		// particular Tab.
-		List_dir::Cursor_map m_cursor_map;
+		// Cursor_cache is shared between all List_dir handlers
+		// that exist in a particular Tab.
+		std::shared_ptr<Cursor_cache> m_cursor_cache;
 
 	public:
 		Tab(const boost::filesystem::path& pwd,
@@ -69,11 +71,6 @@ namespace hawk {
 			unsigned ncols,
 			Type_factory* tf,
 			const Type_factory::Type_product& list_dir_closure);
-		Tab(const Tab& t);
-		Tab(Tab&& t) noexcept;
-
-		Tab& operator=(const Tab& t);
-		Tab& operator=(Tab&& t) noexcept;
 
 		const boost::filesystem::path& get_pwd() const;
 		void set_pwd(boost::filesystem::path pwd);
@@ -81,6 +78,7 @@ namespace hawk {
 			boost::system::error_code& ec) noexcept;
 
 		void add_column(const boost::filesystem::path& pwd);
+		// Removes the leftmost column.
 		void remove_column();
 
 		Column_vector& get_columns();
@@ -100,18 +98,6 @@ namespace hawk {
 		void set_cursor(List_dir::Dir_cursor cursor);
 		void set_cursor(List_dir::Dir_cursor cursor,
 			boost::system::error_code& ec) noexcept;
-
-		// Tries to find a cursor with key cursor_hash.
-		// Returns true on success (that is result != m_cursor_map.end()).
-		// The resulting find iterator is stored in iter.
-		bool find_cursor(size_t cursor_hash,
-			List_dir::Cursor_map::iterator& iter);
-
-		// Stores a cursor in the cursor map.
-		void store_cursor(size_t key, size_t cursor_hash);
-
-		List_dir::Cursor_map&
-			get_cursor_map() { return m_cursor_map; }
 
 	private:
 		void build_columns(unsigned ncols);
@@ -133,10 +119,6 @@ namespace hawk {
 		inline const boost::filesystem::path* get_last_column_path() const;
 
 		void update_active_cursor();
-
-		// Updates pointers to this instance of Tab of all columns
-		// by calling their _set_parent_tab methods.
-		void update_cols_tab_ptr();
 	};
 }
 
