@@ -26,12 +26,12 @@
 #include <memory>
 #include "Column.h"
 #include "Type_factory.h"
-#include "Cursor_cache.h"
 #include "handlers/List_dir.h"
 #include "handlers/List_dir_hash_extern.h"
 
 namespace hawk {
 	class Type_factory;
+	class Cursor_cache;
 
 	class Tab
 	{
@@ -55,15 +55,17 @@ namespace hawk {
 
 		// Cursor_cache is shared between all List_dir handlers
 		// that exist in a particular Tab.
-		std::shared_ptr<Cursor_cache> m_cursor_cache;
+		std::shared_ptr<Cursor_cache>& m_cursor_cache;
 
 	public:
 		Tab(const boost::filesystem::path& path,
-			unsigned ncols,
+			std::shared_ptr<Cursor_cache>& cc,
+			int ncols,
 			Type_factory* tf,
 			const Type_factory::Handler& list_dir_closure);
 		Tab(boost::filesystem::path&& path,
-			unsigned ncols,
+			std::shared_ptr<Cursor_cache>& cc,
+			int ncols,
 			Type_factory* tf,
 			const Type_factory::Handler& list_dir_closure);
 
@@ -82,7 +84,7 @@ namespace hawk {
 
 		Column* get_active_column() { return m_active_column; }
 		const Column* get_active_column() const { return m_active_column; }
-		size_t get_current_ncols(); // don't confuse this with the size of column vector
+		int get_current_ncols(); // don't confuse this with the size of column vector
 
 		// Get List_dir handler of the active column.
 		List_dir* get_active_ld()
@@ -96,7 +98,7 @@ namespace hawk {
 			boost::system::error_code& ec) noexcept;
 
 	private:
-		void build_columns(unsigned ncols);
+		void build_columns(int ncols);
 		void update_paths(boost::filesystem::path path);
 
 		void add_column(const boost::filesystem::path& path,

@@ -22,31 +22,48 @@
 #include <utility>
 #include <exception>
 #include "Tab.h"
+#include "Cursor_cache.h"
 
 using namespace boost::filesystem;
 
 namespace hawk {
 
-static void dissect_path(path& p, unsigned ncols, std::vector<path>& out)
+static void dissect_path(path& p, int ncols, std::vector<path>& out)
 {
-	for (; ncols >= 0; --ncols)
+	for (int i = 0; i < ncols; i++)
+		out.emplace_back();
+
+	--ncols;
+	for (; ncols >= 0; ncols--)
 	{
 		out[ncols] = p;
 		p = p.parent_path();
 	}
 }
 
-Tab::Tab(const path& p, unsigned ncols,
-	Type_factory* tf, const Type_factory::Handler& list_dir_closure)
+Tab::Tab(const path& p, std::shared_ptr<Cursor_cache>& cc, int ncols,
+		 Type_factory* tf, const Type_factory::Handler& list_dir_closure)
 	:
-	m_path{p},
-	m_columns{ncols},
-	m_type_factory{tf},
-	m_list_dir_closure{list_dir_closure},
-	m_has_preview{false},
-	m_cursor_cache{std::make_shared<Cursor_cache>()}
+	  m_path{p},
+	  m_columns{},
+	  m_type_factory{tf},
+	  m_list_dir_closure{list_dir_closure},
+	  m_has_preview{false},
+	  m_cursor_cache{cc}
 {
-	m_columns.reserve(ncols + 5);
+	build_columns(ncols);
+}
+
+Tab::Tab(path&& p, std::shared_ptr<Cursor_cache>& cc, int ncols,
+		 Type_factory* tf, const Type_factory::Handler& list_dir_closure)
+	:
+	  m_path{std::move(p)},
+	  m_columns{},
+	  m_type_factory{tf},
+	  m_list_dir_closure{list_dir_closure},
+	  m_has_preview{false},
+	  m_cursor_cache{cc}
+{
 	build_columns(ncols);
 }
 
@@ -92,9 +109,9 @@ const Tab::Column_vector& Tab::get_columns() const
 	return m_columns;
 }
 
-size_t Tab::get_current_ncols()
+int Tab::get_current_ncols()
 {
-	size_t ncols = m_columns.size();
+	int ncols = m_columns.size();
 	return (m_has_preview ? (ncols - 2) : --ncols);
 }
 
@@ -151,23 +168,21 @@ void Tab::set_cursor(List_dir::Dir_cursor cursor,
 	}
 }
 
-void Tab::build_columns(unsigned ncols)
+void Tab::build_columns(int ncols)
 {
 	static std::vector<path> path_vec;
-	path_vec.reserve(ncols);
+	path_vec.clear();
 
 	path p = m_path;
-	--ncols;
-
 	dissect_path(p, ncols, path_vec);
 
-	for (unsigned i = 0; i < ncols; i++)
+	for (int i = 0; i < ncols; i++)
 	{
 		add_column(std::move(path_vec[i]));
 	}
 
 	auto it = m_columns.cbegin();
-	for (size_t i = 0; i < ncols; i++)
+	for (int i = 0; i < ncols; i++)
 	{
 		m_columns[i]->_set_next_column( (++it)->get() );
 	}
@@ -178,7 +193,7 @@ void Tab::build_columns(unsigned ncols)
 
 void Tab::update_paths(path p)
 {
-	size_t ncols = get_current_ncols();
+	int ncols = get_current_ncols();
 
 	m_columns[ncols]->set_path(p);
 	for (int i = ncols - 1; i >= 0; i--)
