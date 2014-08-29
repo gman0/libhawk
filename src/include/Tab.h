@@ -36,21 +36,16 @@ namespace hawk {
 	class Tab
 	{
 	public:
-		using Column_vector = std::vector<Column>;
+		using Column_vector = std::vector<std::unique_ptr<Column>>;
 
 	private:
-		// PWD usually stands for Print Working Directory
-		// but there's no printing involved as this only
-		// holds the current working directory.
-
-		/// XXX: Rename this to m_path for consistency
-		boost::filesystem::path m_pwd;
+		boost::filesystem::path m_path;
 
 		Column_vector m_columns;
 		Column* m_active_column;
 
 		Type_factory* m_type_factory;
-		Type_factory::Type_product m_list_dir_closure;
+		Type_factory::Handler m_list_dir_closure;
 
 		// This one's used to check whether we have
 		// a preview column. Also, we can make the assumption
@@ -63,21 +58,22 @@ namespace hawk {
 		std::shared_ptr<Cursor_cache> m_cursor_cache;
 
 	public:
-		Tab(const boost::filesystem::path& pwd,
+		Tab(const boost::filesystem::path& path,
 			unsigned ncols,
 			Type_factory* tf,
-			const Type_factory::Type_product& list_dir_closure);
-		Tab(boost::filesystem::path&& pwd,
+			const Type_factory::Handler& list_dir_closure);
+		Tab(boost::filesystem::path&& path,
 			unsigned ncols,
 			Type_factory* tf,
-			const Type_factory::Type_product& list_dir_closure);
+			const Type_factory::Handler& list_dir_closure);
 
-		const boost::filesystem::path& get_pwd() const;
-		void set_pwd(boost::filesystem::path pwd);
-		void set_pwd(const boost::filesystem::path& pwd,
+		const boost::filesystem::path& get_path() const;
+		void set_path(boost::filesystem::path path);
+		void set_path(const boost::filesystem::path& path,
 			boost::system::error_code& ec) noexcept;
 
-		void add_column(const boost::filesystem::path& pwd);
+		void add_column(const boost::filesystem::path& path);
+		void add_column(boost::filesystem::path&& path);
 		// Removes the leftmost column.
 		void remove_column();
 
@@ -91,7 +87,7 @@ namespace hawk {
 		// Get List_dir handler of the active column.
 		List_dir* get_active_ld()
 		{
-			return static_cast<List_dir*>(m_active_column->get_handler());
+			return static_cast<List_dir*>(m_active_column);
 		}
 
 		List_dir::Dir_cursor get_begin_cursor() const;
@@ -101,19 +97,19 @@ namespace hawk {
 
 	private:
 		void build_columns(unsigned ncols);
-		void update_paths(boost::filesystem::path pwd);
+		void update_paths(boost::filesystem::path path);
 
-		void add_column(const boost::filesystem::path& pwd,
-			const Type_factory::Type_product& closure);
-		void add_column(boost::filesystem::path&& pwd,
-			const Type_factory::Type_product& closure);
-		void add_column(const boost::filesystem::path& pwd,
-			const Type_factory::Type_product& closure,
+		void add_column(const boost::filesystem::path& path,
+			const Type_factory::Handler& closure);
+		void add_column(boost::filesystem::path&& path,
+			const Type_factory::Handler& closure);
+		void add_column(const boost::filesystem::path& path,
+			const Type_factory::Handler& closure,
 			unsigned inplace_col);
 
 		inline void activate_last_column()
 		{
-			m_active_column = &(m_columns.back());
+			m_active_column = m_columns.back().get();
 		}
 
 		inline const boost::filesystem::path* get_last_column_path() const;

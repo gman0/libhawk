@@ -27,10 +27,19 @@ using namespace boost::filesystem;
 
 namespace hawk {
 
-Tab::Tab(const path& pwd, unsigned ncols,
-	Type_factory* tf, const Type_factory::Type_product& list_dir_closure)
+static void dissect_path(path& p, unsigned ncols, std::vector<path>& out)
+{
+	for (; ncols >= 0; --ncols)
+	{
+		out[ncols] = p;
+		p = p.parent_path();
+	}
+}
+
+Tab::Tab(const path& p, unsigned ncols,
+	Type_factory* tf, const Type_factory::Handler& list_dir_closure)
 	:
-	m_pwd{pwd},
+	m_path{p},
 	m_columns{ncols},
 	m_type_factory{tf},
 	m_list_dir_closure{list_dir_closure},
@@ -41,31 +50,31 @@ Tab::Tab(const path& pwd, unsigned ncols,
 	build_columns(ncols);
 }
 
-const path& Tab::get_pwd() const
+const path& Tab::get_path() const
 {
-	return m_pwd;
+	return m_path;
 }
 
-void Tab::set_pwd(path pwd)
+void Tab::set_path(path p)
 {
-	if (pwd.empty()) return;
+	if (p.empty()) return;
 
-	pwd = canonical(pwd, m_pwd);
+	p = canonical(p, m_path);
 
-	if (pwd.empty())
-		pwd = "/";
+	if (p.empty())
+		p = "/";
 
-	update_paths(pwd);
+	update_paths(p);
 	update_active_cursor();
 
-	m_pwd = std::move(pwd);
+	m_path = std::move(p);
 }
 
-void Tab::set_pwd(const path& pwd,
+void Tab::set_path(const path& p,
 	boost::system::error_code& ec) noexcept
 {
 	try {
-		set_pwd(pwd);
+		set_path(p);
 	}
 	catch (const boost::filesystem::filesystem_error& e)
 	{
@@ -92,7 +101,7 @@ size_t Tab::get_current_ncols()
 List_dir::Dir_cursor Tab::get_begin_cursor() const
 {
 	List_dir* ld =
-		static_cast<List_dir*>(m_active_column->get_handler());
+		static_cast<List_dir*>(m_active_column);
 	return ld->get_contents().begin();
 }
 
@@ -118,13 +127,11 @@ void Tab::set_cursor(List_dir::Dir_cursor cursor)
 
 	// add new preview column if we need to
 
-	Type_factory::Type_product closure =
-		(*m_type_factory)[cursor->path];
+	Type_factory::Handler closure = m_type_factory->get_handler(cursor->path);
 
 	if (closure)
 	{
 		add_column(cursor->path, closure);
-		m_columns.back()._ready();
 		m_has_preview = true;
 	}
 }
@@ -146,43 +153,38 @@ void Tab::set_cursor(List_dir::Dir_cursor cursor,
 
 void Tab::build_columns(unsigned ncols)
 {
-	path p = m_pwd;
+	static std::vector<path> path_vec;
+	path_vec.reserve(ncols);
+
+	path p = m_path;
 	--ncols;
 
-	// create the columns
-	add_column(m_pwd, m_list_dir_closure, ncols);
-	for (int i = ncols - 1; i >= 0; i--)
+	dissect_path(p, ncols, path_vec);
+
+	for (unsigned i = 0; i < ncols; i++)
 	{
-		p = std::move(p.parent_path());
-		add_column(p, m_list_dir_closure, i);
+		add_column(std::move(path_vec[i]));
 	}
 
-	// set their child columns and make them _ready
 	auto it = m_columns.cbegin();
 	for (size_t i = 0; i < ncols; i++)
 	{
-		Column& column = m_columns[i];
-
-		column._set_child_column(&(*++it));
-		column._ready();
+		m_columns[i]->_set_next_column( (++it)->get() );
 	}
-
-	// the last (active) column has no child
-	m_columns[ncols]._ready();
 
 	activate_last_column();
 	update_active_cursor();
 }
 
-void Tab::update_paths(path pwd)
+void Tab::update_paths(path p)
 {
 	size_t ncols = get_current_ncols();
 
-	m_columns[ncols].set_path(pwd);
+	m_columns[ncols]->set_path(p);
 	for (int i = ncols - 1; i >= 0; i--)
 	{
-		pwd = std::move(pwd.parent_path());
-		m_columns[i].set_path(pwd);
+		p = std::move(p.parent_path());
+		m_columns[i]->set_path(p);
 	}
 }
 
@@ -195,33 +197,38 @@ void Tab::remove_column()
 	m_columns.erase(m_columns.begin());
 }
 
-void Tab::add_column(const path& pwd)
+void Tab::add_column(const path& p)
 {
-	add_column(pwd, m_list_dir_closure);
+	add_column(p, m_list_dir_closure);
 }
 
-void Tab::add_column(const path& pwd,
-	const Type_factory::Type_product& closure)
+void Tab::add_column(path&& p)
 {
-	m_columns.emplace_back(pwd, closure);
+	add_column(std::move(p), m_list_dir_closure);
 }
 
-void Tab::add_column(path&& pwd,
-	const Type_factory::Type_product& closure)
+void Tab::add_column(const path& p,
+	const Type_factory::Handler& closure)
 {
-	m_columns.emplace_back(std::move(pwd), closure);
+	m_columns.emplace_back(closure(p));
 }
 
-void Tab::add_column(const path& pwd,
-	const Type_factory::Type_product& closure, unsigned inplace_col)
+void Tab::add_column(path&& p,
+	const Type_factory::Handler& closure)
 {
-	m_columns[inplace_col] = {pwd, closure};
+	m_columns.emplace_back(closure(p));
+}
+
+void Tab::add_column(const path& p,
+	const Type_factory::Handler& closure, unsigned inplace_col)
+{
+	m_columns[inplace_col].reset(closure(p));
 }
 
 void Tab::update_active_cursor()
 {
 	List_dir* active_handler =
-		static_cast<List_dir*>(m_active_column->get_handler());
+		static_cast<List_dir*>(m_active_column);
 
 	set_cursor(active_handler->get_cursor());
 }
@@ -231,7 +238,7 @@ const boost::filesystem::path* Tab::get_last_column_path() const
 	if (m_columns.empty())
 		return nullptr;
 	else
-		return &(m_columns.back().get_path());
+		return &(m_columns.back()->get_path());
 }
 
 } // namespace hawk
