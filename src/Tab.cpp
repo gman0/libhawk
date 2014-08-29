@@ -235,10 +235,7 @@ void Tab::update_active_cursor()
 
 const boost::filesystem::path* Tab::get_last_column_path() const
 {
-	if (m_columns.empty())
-		return nullptr;
-	else
-		return &(m_columns.back()->get_path());
+	return &(m_columns.back()->get_path());
 }
 
 } // namespace hawk
