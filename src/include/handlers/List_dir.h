@@ -24,7 +24,6 @@
 #include <string>
 #include <ctime>
 #include <utility>
-#include <memory>
 #include <boost/filesystem.hpp>
 #include "Column.h"
 #include "No_hash.h"
@@ -46,7 +45,7 @@ namespace hawk {
 		using Dir_cursor = Dir_vector::iterator;
 
 	private:
-		std::shared_ptr<Cursor_cache> m_cursor_cache;
+		Cursor_cache* m_cursor_cache;
 
 		// This will hold the hash value of current path
 		// which will be used as a key in m_cursor_cache.
@@ -66,8 +65,7 @@ namespace hawk {
 		Dir_cursor m_cursor;
 
 	public:
-		List_dir(const boost::filesystem::path& path,
-				 std::shared_ptr<Cursor_cache>& cc)
+		List_dir(const boost::filesystem::path& path, Cursor_cache* cc)
 			:
 			  Column{path},
 			  m_cursor_cache{cc},
@@ -75,8 +73,7 @@ namespace hawk {
 			  m_implicit_cursor{true}
 		{}
 
-		List_dir(boost::filesystem::path&& path,
-				 std::shared_ptr<Cursor_cache>& cc)
+		List_dir(boost::filesystem::path&& path, Cursor_cache* cc)
 			:
 			  Column{std::move(path)},
 			  m_cursor_cache{cc},
@@ -85,15 +82,7 @@ namespace hawk {
 		{}
 
 		List_dir(const List_dir&) = delete;
-
-		List_dir(List_dir&& ld) noexcept
-			:
-			  Column{std::move(ld)},
-			  m_path_hash{ld.m_path_hash},
-			  m_dir_items{std::move(ld.m_dir_items)},
-			  m_cursor{std::move(ld.m_cursor)}
-		{ ld.m_path_hash = 0; }
-
+		List_dir(List_dir&& ld) noexcept;
 		List_dir& operator=(List_dir&& ld) noexcept;
 
 		// Get a reference to the vector of current directory's contents.

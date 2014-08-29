@@ -41,7 +41,7 @@ static void dissect_path(path& p, int ncols, std::vector<path>& out)
 	}
 }
 
-Tab::Tab(const path& p, std::shared_ptr<Cursor_cache>& cc, int ncols,
+Tab::Tab(const path& p, Cursor_cache* cc, int ncols,
 		 Type_factory* tf, const Type_factory::Handler& list_dir_closure)
 	:
 	  m_path{p},
@@ -54,7 +54,7 @@ Tab::Tab(const path& p, std::shared_ptr<Cursor_cache>& cc, int ncols,
 	build_columns(ncols);
 }
 
-Tab::Tab(path&& p, std::shared_ptr<Cursor_cache>& cc, int ncols,
+Tab::Tab(path&& p, Cursor_cache* cc, int ncols,
 		 Type_factory* tf, const Type_factory::Handler& list_dir_closure)
 	:
 	  m_path{std::move(p)},

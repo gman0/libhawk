@@ -21,7 +21,6 @@
 #define HAWK_TAB_MANAGER_H
 
 #include <list>
-#include <memory>
 #include "Tab.h"
 
 namespace hawk {
@@ -51,11 +50,11 @@ namespace hawk {
 		void set_active_tab(Tab_iterator& tab);
 		void set_active_tab(Tab_iterator&& tab);
 
-		Tab_iterator& add_tab(std::shared_ptr<Cursor_cache>& cc);
+		Tab_iterator& add_tab(Cursor_cache* cc);
 		Tab_iterator& add_tab(const boost::filesystem::path& pwd,
-							  std::shared_ptr<Cursor_cache>& cc);
+							  Cursor_cache* cc);
 		Tab_iterator& add_tab(boost::filesystem::path&& pwd,
-							  std::shared_ptr<Cursor_cache>& cc);
+							  Cursor_cache* cc);
 		void remove_tab(Tab_iterator& tab);
 		int  count() const;
 	};

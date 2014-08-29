@@ -55,16 +55,16 @@ namespace hawk {
 
 		// Cursor_cache is shared between all List_dir handlers
 		// that exist in a particular Tab.
-		std::shared_ptr<Cursor_cache>& m_cursor_cache;
+		Cursor_cache* m_cursor_cache;
 
 	public:
 		Tab(const boost::filesystem::path& path,
-			std::shared_ptr<Cursor_cache>& cc,
+			Cursor_cache* cc,
 			int ncols,
 			Type_factory* tf,
 			const Type_factory::Handler& list_dir_closure);
 		Tab(boost::filesystem::path&& path,
-			std::shared_ptr<Cursor_cache>& cc,
+			Cursor_cache* cc,
 			int ncols,
 			Type_factory* tf,
 			const Type_factory::Handler& list_dir_closure);

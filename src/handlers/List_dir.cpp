@@ -65,17 +65,31 @@ static List_dir::Dir_cursor match_cursor(List_dir::Dir_vector& vec,
 				});
 }
 
+List_dir::List_dir(List_dir&& ld) noexcept
+	:
+	  Column{std::move(ld)},
+	  m_cursor_cache{ld.m_cursor_cache},
+	  m_path_hash{ld.m_path_hash},
+	  m_dir_items{std::move(ld.m_dir_items)},
+	  m_cursor{std::move(ld.m_cursor)}
+{
+	ld.m_path_hash = 0;
+	ld.m_cursor_cache = nullptr;
+}
+
 List_dir& List_dir::operator=(List_dir&& ld) noexcept
 {
 	if (this == &ld)
 		return *this;
 
 	Column::operator=(std::move(ld));
-	m_cursor_cache = std::move(ld.m_cursor_cache);
+	m_cursor_cache = ld.m_cursor_cache;
 	m_path_hash = ld.m_path_hash;
 	m_dir_items = std::move(ld.m_dir_items);
 	m_cursor = std::move(ld.m_cursor);
 	m_implicit_cursor = ld.m_implicit_cursor;
+
+	ld.m_cursor_cache = nullptr;
 
 	return *this;
 }

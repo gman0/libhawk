@@ -50,8 +50,7 @@ void Tab_manager::set_active_tab(Tab_manager::Tab_iterator&& tab)
 	m_active_tab = std::move(tab);
 }
 
-Tab_manager::Tab_iterator& Tab_manager::add_tab(
-		std::shared_ptr<Cursor_cache>& cc)
+Tab_manager::Tab_iterator& Tab_manager::add_tab(Cursor_cache* cc)
 {
 	m_tabs.emplace_back(m_active_tab->get_path(), cc, m_ncols,
 						m_type_factory, m_list_dir_closure);
@@ -59,14 +58,14 @@ Tab_manager::Tab_iterator& Tab_manager::add_tab(
 }
 
 Tab_manager::Tab_iterator& Tab_manager::add_tab(
-		const boost::filesystem::path& pwd, std::shared_ptr<Cursor_cache>& cc)
+		const boost::filesystem::path& pwd, Cursor_cache* cc)
 {
 	m_tabs.emplace_back(pwd, cc, m_ncols, m_type_factory, m_list_dir_closure);
 	return (m_active_tab = --m_tabs.end());
 }
 
 Tab_manager::Tab_iterator& Tab_manager::add_tab(
-		boost::filesystem::path&& pwd, std::shared_ptr<Cursor_cache>& cc)
+		boost::filesystem::path&& pwd, Cursor_cache* cc)
 {
 	m_tabs.emplace_back(
 			std::move(pwd), cc, m_ncols, m_type_factory, m_list_dir_closure);
