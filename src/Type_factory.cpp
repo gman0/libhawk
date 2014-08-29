@@ -20,7 +20,6 @@
 #include <algorithm>
 #include <exception>
 #include "Type_factory.h"
-#include "Handler.h"
 #include "calchash.h"
 
 using namespace boost::filesystem;
@@ -57,12 +56,12 @@ Type_factory::Type_factory()
 }
 
 void Type_factory::register_type(size_t type,
-	const Type_factory::Type_product& tp)
+	const Type_factory::Handler& tp)
 {
 	m_types[type] = tp;
 }
 
-Type_factory::Type_product Type_factory::operator[](size_t type)
+Type_factory::Handler Type_factory::operator[](size_t type)
 {
 	auto it = std::find_if(m_types.begin(), m_types.end(),
 		[&type](const Type_map::value_type& v)
@@ -72,7 +71,7 @@ Type_factory::Type_product Type_factory::operator[](size_t type)
 	);
 
 	if (it == m_types.end())
-		return Type_product {nullptr};
+		return Handler {nullptr};
 
 	// We've got the mime-type category figured out, now let's check
 	// if we need to check for the specific type too.
@@ -80,15 +79,26 @@ Type_factory::Type_product Type_factory::operator[](size_t type)
 	{
 		// ok we need to check the whole mime type hash
 		if (type != it->first)
-			return Type_product {nullptr};
+			return Handler {nullptr};
 	}
 
 	return it->second;
 }
 
-Type_factory::Type_product Type_factory::operator[](const path& p)
+Type_factory::Handler Type_factory::operator[](const path& p)
 {
 	return operator[](get_hash_type(p));
+}
+
+Type_factory::Handler Type_factory::get_handler(size_t type)
+{
+	return operator[](type);
+}
+
+Type_factory::Handler Type_factory::get_handler(
+		const boost::filesystem::path& p)
+{
+	return operator[](p);
 }
 
 const char* Type_factory::get_mime(const path& p)

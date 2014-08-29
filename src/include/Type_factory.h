@@ -35,13 +35,11 @@ namespace hawk {
 	class Type_factory
 	{
 	public:
-		using Type_product =
-			std::function<Handler*(const boost::filesystem::path&,
-									Column*)>;
+		using Handler = std::function<Column*(const boost::filesystem::path&)>;
 
 	private:
 		using Type_map =
-			std::unordered_map<size_t, Type_product, No_hash>;
+			std::unordered_map<size_t, Handler, No_hash>;
 
 		Type_map m_types;
 
@@ -57,9 +55,13 @@ namespace hawk {
 		Type_factory();
 		Type_factory(const Type_factory&) = delete;
 
-		void register_type(size_t type, const Type_product& tp);
-		Type_product operator[](size_t type);
-		Type_product operator[](const boost::filesystem::path& p);
+		void register_type(size_t type, const Handler& tp);
+
+		Handler operator[](size_t type);
+		Handler operator[](const boost::filesystem::path& p);
+
+		Handler get_handler(size_t type);
+		Handler get_handler(const boost::filesystem::path& p);
 
 		const char* get_mime(const boost::filesystem::path& p);
 		size_t get_hash_type(const boost::filesystem::path& p);
