@@ -34,7 +34,7 @@ namespace hawk {
 		Tab_iterator m_active_tab;
 
 		Type_factory* m_type_factory;
-		Type_factory::Type_product m_list_dir_closure;
+		Type_factory::Handler m_list_dir_closure;
 
 		// default number of columns to create
 		unsigned m_ncols;

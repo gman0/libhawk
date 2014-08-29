@@ -52,7 +52,7 @@ void Tab_manager::set_active_tab(Tab_manager::Tab_iterator&& tab)
 
 Tab_manager::Tab_iterator& Tab_manager::add_tab()
 {
-	m_tabs.emplace_back(m_active_tab->get_pwd(), m_ncols,
+	m_tabs.emplace_back(m_active_tab->get_path(), m_ncols,
 						m_type_factory, m_list_dir_closure);
 	return (m_active_tab = --m_tabs.end());
 }
