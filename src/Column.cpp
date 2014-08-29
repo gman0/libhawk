@@ -26,46 +26,9 @@ using namespace boost::filesystem;
 
 namespace hawk {
 
-Column::Column(const path& p,
-	const Type_factory::Type_product& tp)
-	:
-	m_path{p},
-	m_child_column{},
-	m_handler_closure{tp}
-{}
-
-Column::Column(path&& p,
-	const Type_factory::Type_product& tp)
-	:
-	m_path{std::move(p)},
-	m_child_column{},
-	m_handler_closure{tp}
-{}
-
-void Column::_ready()
+void Column::_set_next_column(const Column* next_column)
 {
-	if (m_handler)
-	{
-		throw std::logic_error
-			{ "Handler already created" };
-	}
-
-	m_handler.reset(m_handler_closure(m_path, this));
-}
-
-void Column::_set_child_column(const Column* child_column)
-{
-	m_child_column = child_column;
-}
-
-Handler* Column::get_handler()
-{
-	return m_handler.get();
-}
-
-const Handler* Column::get_handler() const
-{
-	return m_handler.get();
+	m_next_column = next_column;
 }
 
 const path& Column::get_path() const
@@ -73,24 +36,17 @@ const path& Column::get_path() const
 	return m_path;
 }
 
-const path* Column::get_child_path() const
+const path* Column::get_next_path() const
 {
-	if (!m_child_column)
+	if (!m_next_column)
 		return nullptr;
 	else
-		return &m_child_column->get_path();
+		return &m_next_column->get_path();
 }
 
 void Column::set_path(const path& p)
 {
-	m_handler->set_path(p);
 	m_path = p;
-}
-
-void Column::set_path(path&& p)
-{
-	m_path = std::move(p);
-	m_handler->set_path(m_path);
 }
 
 } // namespace hawk

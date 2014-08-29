@@ -23,44 +23,43 @@
 #include <memory>
 #include <utility>
 #include <vector>
-#include "Handler.h"
-#include "handlers/List_dir.h"
+#include <boost/filesystem/path.hpp>
 
 namespace hawk {
 	class Column
 	{
-	private:
-		using Type_product =
-			std::function<Handler*(const boost::filesystem::path&,
-									Column*)>;
-
+	protected:
 		boost::filesystem::path m_path;
-		const Column* m_child_column;
-
-		std::shared_ptr<Handler> m_handler;
-		Type_product m_handler_closure;
+		const Column* m_next_column;
 
 	public:
-		Column() : m_child_column{}
+		Column() : m_next_column{}
 		{}
 
-		Column(const boost::filesystem::path& path,
-			const Type_product& tp);
-		Column(boost::filesystem::path&& path,
-			const Type_product& tp);
+		Column(const boost::filesystem::path& path)
+			:
+			  m_path{path},
+			  m_next_column{}
+		{}
 
-		// for internal/expert use only
-		void _ready();
-		void _set_child_column(const Column* child_column);
+		Column(boost::filesystem::path&& path)
+			:
+			  m_path{std::move(path)},
+			  m_next_column{}
+		{}
 
-		Handler* get_handler();
-		const Handler* get_handler() const;
+		virtual ~Column() = default;
+
+		// For internal/expert use only.
+		void _set_next_column(const Column* next_column);
 
 		const boost::filesystem::path& get_path() const;
-		void set_path(const boost::filesystem::path& path);
-		void set_path(boost::filesystem::path&& path);
+		virtual void set_path(const boost::filesystem::path& path);
 
-		const boost::filesystem::path* get_child_path() const;
+		// Returns nullptr when m_next_column is nullptr.
+		// Otherwise pointer to path of the next column
+		// is returned.
+		const boost::filesystem::path* get_next_path() const;
 	};
 }
 
