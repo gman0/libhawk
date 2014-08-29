@@ -55,16 +55,14 @@ static void gather_dir_contents(const path& p, List_dir::Dir_vector& out)
 	}
 }
 
-List_dir::List_dir(const boost::filesystem::path& path,
-	Column* parent_column,
-	std::shared_ptr<Cursor_cache>& cc)
-	:
-	  Handler{path, parent_column},
-	  m_cursor_cache{cc},
-	  m_path_hash{0},
-	  m_implicit_cursor{true}
+static List_dir::Dir_cursor match_cursor(List_dir::Dir_vector& vec,
+										 size_t match_hash)
 {
-	set_path(path);
+	return std::find_if(vec.begin(), vec.end(),
+				[match_hash](const List_dir::Dir_entry& dir_ent)
+				{
+					return (hash_value(dir_ent.path) == match_hash);
+				});
 }
 
 List_dir& List_dir::operator=(List_dir&& ld) noexcept
@@ -72,7 +70,7 @@ List_dir& List_dir::operator=(List_dir&& ld) noexcept
 	if (this == &ld)
 		return *this;
 
-	Handler::operator=(std::move(ld));
+	Column::operator=(std::move(ld));
 	m_cursor_cache = std::move(ld.m_cursor_cache);
 	m_path_hash = ld.m_path_hash;
 	m_dir_items = std::move(ld.m_dir_items);
@@ -90,18 +88,18 @@ bool List_dir::read_directory()
 	if (m_dir_items.size() > cache_threshold)
 		m_dir_items.resize(cache_threshold);
 
-	gather_dir_contents(*m_path, m_dir_items);
+	gather_dir_contents(m_path, m_dir_items);
 
 	//
 	// set the cursor
 	//
 
-	const path* child_path = m_parent_column->get_child_path();
+	const path* next_path = m_next_column->get_next_path();
 
 	// Do we have a child path (i.e. child column)?
-	if (child_path)
+	if (next_path)
 	{
-		set_cursor(*child_path);
+		set_cursor(*next_path);
 		return false;
 	}
 	else
@@ -114,7 +112,8 @@ bool List_dir::read_directory()
 			// Ok, so we DID find the hash of the cursor,
 			// now let's assign it to the correct Dir_vector
 			// item if we can.
-			Dir_cursor cursor = match_cursor(cursor_hash_it->second);
+			Dir_cursor cursor = match_cursor(m_dir_items,
+											 cursor_hash_it->second);
 
 			if (cursor != m_dir_items.end())
 			{
@@ -145,7 +144,7 @@ void List_dir::set_cursor(List_dir::Dir_cursor cursor)
 
 void List_dir::set_cursor(const path& cur)
 {
-	Dir_cursor cursor = match_cursor(hash_value(cur));
+	Dir_cursor cursor = match_cursor(m_dir_items, hash_value(cur));
 
 	if (cursor != m_dir_items.end())
 		set_cursor(cursor);
@@ -178,19 +177,10 @@ void List_dir::set_path(const path& dir)
 					boost::system::errc::permission_denied) };
 	}
 
-	Handler::set_path(dir);
+	Column::set_path(dir);
 	m_path_hash = hash_value(dir);
 
 	m_implicit_cursor = read_directory();
-}
-
-List_dir::Dir_cursor List_dir::match_cursor(size_t match_hash)
-{
-	return std::find_if(m_dir_items.begin(), m_dir_items.end(),
-				[match_hash](const Dir_entry& dir_ent)
-				{
-					return (hash_value(dir_ent.path) == match_hash);
-				});
 }
 
 } // namespace hawk

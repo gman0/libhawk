@@ -26,14 +26,13 @@
 #include <utility>
 #include <memory>
 #include <boost/filesystem.hpp>
-#include "Handler.h"
+#include "Column.h"
 #include "No_hash.h"
 
 namespace hawk {
-	class Column;
 	class Cursor_cache;
 
-	class List_dir : public Handler
+	class List_dir : public Column
 	{
 	public:
 		struct Dir_entry
@@ -68,15 +67,31 @@ namespace hawk {
 
 	public:
 		List_dir(const boost::filesystem::path& path,
-			Column* parent_column, std::shared_ptr<Cursor_cache>& cc);
+				 std::shared_ptr<Cursor_cache>& cc)
+			:
+			  Column{path},
+			  m_cursor_cache{cc},
+			  m_path_hash{0},
+			  m_implicit_cursor{true}
+		{}
+
+		List_dir(boost::filesystem::path&& path,
+				 std::shared_ptr<Cursor_cache>& cc)
+			:
+			  Column{std::move(path)},
+			  m_cursor_cache{cc},
+			  m_path_hash{0},
+			  m_implicit_cursor{true}
+		{}
+
 		List_dir(const List_dir&) = delete;
 
 		List_dir(List_dir&& ld) noexcept
 			:
-			Handler{std::move(ld)},
-			m_path_hash{ld.m_path_hash},
-			m_dir_items{std::move(ld.m_dir_items)},
-			m_cursor{std::move(ld.m_cursor)}
+			  Column{std::move(ld)},
+			  m_path_hash{ld.m_path_hash},
+			  m_dir_items{std::move(ld.m_dir_items)},
+			  m_cursor{std::move(ld.m_cursor)}
 		{ ld.m_path_hash = 0; }
 
 		List_dir& operator=(List_dir&& ld) noexcept;
@@ -105,8 +120,6 @@ namespace hawk {
 		// Returns true if the cursor was aquired implicity,
 		// otherwise false.
 		bool read_directory();
-
-		Dir_cursor match_cursor(size_t match_hash);
 	};
 }
 
