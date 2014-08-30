@@ -30,12 +30,10 @@
 #include "Column.h"
 
 namespace hawk {
-	class Handler;
-
 	class Type_factory
 	{
 	public:
-		using Handler = std::function<Column*(const boost::filesystem::path&)>;
+		using Handler = std::function<Column*()>;
 
 	private:
 		using Type_map =
