@@ -33,8 +33,6 @@
 
 using namespace boost::filesystem;
 
-constexpr int cache_threshold = 1024;
-
 namespace hawk {
 
 // Gather contents of a directory and move them to the out vector
@@ -94,53 +92,43 @@ List_dir& List_dir::operator=(List_dir&& ld) noexcept
 	return *this;
 }
 
-bool List_dir::read_directory()
+void List_dir::read_directory()
 {
 	m_dir_items.clear();
 
 	// Free up some space if we need to.
-	if (m_dir_items.size() > cache_threshold)
-		m_dir_items.resize(cache_threshold);
+	constexpr int cache_max_size = 1024;
+	if (m_dir_items.size() > cache_max_size)
+		m_dir_items.resize(cache_max_size);
 
 	gather_dir_contents(m_path, m_dir_items);
+}
 
-	//
-	// set the cursor
-	//
-
-	const path* next_path = m_next_column->get_next_path();
-
-	// Do we have a child path (i.e. child column)?
-	if (next_path)
+bool List_dir::acquire_cursor()
+{
+	if (m_next_column)
 	{
-		set_cursor(*next_path);
+		set_cursor(*get_next_path());
 		return false;
 	}
-	else
+
+	Cursor_cache::Cursor cursor_hash_it;
+
+	if (m_cursor_cache->find(m_path_hash, cursor_hash_it))
 	{
-		// Try to retrieve the last used cursor.
+		// Ok, so we DID find the hash of the cursor,
+		// now let's assign it to the correct Dir_vector
+		// item if we can.
+		m_cursor = match_cursor(m_dir_items, cursor_hash_it->second);
 
-		Cursor_cache::Cursor cursor_hash_it;
-		if (m_cursor_cache->find(m_path_hash, cursor_hash_it))
-		{
-			// Ok, so we DID find the hash of the cursor,
-			// now let's assign it to the correct Dir_vector
-			// item if we can.
-			Dir_cursor cursor = match_cursor(m_dir_items,
-											 cursor_hash_it->second);
-
-			if (cursor != m_dir_items.end())
-			{
-				m_cursor = cursor;
-				return false;
-			}
-		}
-
-		// We didn't find the cursor, let's use the first
-		// item of our Dir_vector as the cursor (or the
-		// end() iterator if the vector is empty).
-		m_cursor = m_dir_items.begin();
+		if (m_cursor != m_dir_items.end())
+			return false;
 	}
+
+	// We didn't find the cursor, let's use the first
+	// item of our Dir_vector as the cursor (or the
+	// end() iterator if the vector is empty).
+	m_cursor = m_dir_items.begin();
 
 	return true;
 }
@@ -177,24 +165,19 @@ void List_dir::set_path(const path& dir)
 		return;
 	}
 
+	using namespace boost::system::errc;
+
 	if (!is_directory(dir))
-	{
-		throw boost::filesystem::filesystem_error
-			{ dir.native(), boost::system::errc::make_error_code(
-				boost::system::errc::not_a_directory) };
-	}
+		throw filesystem_error {dir.native(), make_error_code(not_a_directory)};
 
 	if (access(dir.c_str(), R_OK) == -1)
-	{
-		throw boost::filesystem::filesystem_error
-			{ dir.native(), boost::system::errc::make_error_code(
-					boost::system::errc::permission_denied) };
-	}
+		throw filesystem_error {dir.native(), make_error_code(permission_denied)};
 
 	Column::set_path(dir);
 	m_path_hash = hash_value(dir);
 
-	m_implicit_cursor = read_directory();
+	read_directory();
+	m_implicit_cursor = acquire_cursor();
 }
 
 } // namespace hawk

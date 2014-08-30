@@ -52,7 +52,7 @@ namespace hawk {
 		size_t m_path_hash;
 
 		// This flag stores the type of cursor aquisition:
-		//  * implicit (true) - aquired as begin/end cursor
+		//  * implicit (true) - acquired as begin/end cursor
 		//  * explicit - everything else
 		//
 		// It can be used e.g. when the resulting item container
@@ -65,17 +65,8 @@ namespace hawk {
 		Dir_cursor m_cursor;
 
 	public:
-		List_dir(const boost::filesystem::path& path, Cursor_cache* cc)
+		List_dir(Cursor_cache* cc)
 			:
-			  Column{path},
-			  m_cursor_cache{cc},
-			  m_path_hash{0},
-			  m_implicit_cursor{true}
-		{}
-
-		List_dir(boost::filesystem::path&& path, Cursor_cache* cc)
-			:
-			  Column{std::move(path)},
 			  m_cursor_cache{cc},
 			  m_path_hash{0},
 			  m_implicit_cursor{true}
@@ -106,9 +97,11 @@ namespace hawk {
 		inline bool implicit_cursor() const { return m_implicit_cursor; }
 
 	private:
-		// Returns true if the cursor was aquired implicity,
+		void read_directory();
+
+		// Returns true if the cursor was acquired implicity,
 		// otherwise false.
-		bool read_directory();
+		bool acquire_cursor();
 	};
 }
 
