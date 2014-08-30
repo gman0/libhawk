@@ -74,8 +74,6 @@ namespace hawk {
 		void set_path(const boost::filesystem::path& path,
 			boost::system::error_code& ec) noexcept;
 
-		void add_column(const boost::filesystem::path& path);
-		void add_column(boost::filesystem::path&& path);
 		// Removes the leftmost column.
 		void remove_column();
 
@@ -84,35 +82,31 @@ namespace hawk {
 
 		Column* get_active_column() { return m_active_column; }
 		const Column* get_active_column() const { return m_active_column; }
-		int get_current_ncols(); // don't confuse this with the size of column vector
+		// don't confuse this with the size of column vector
+		int get_current_ncols();
 
 		// Get List_dir handler of the active column.
 		List_dir* get_active_ld()
-		{
-			return static_cast<List_dir*>(m_active_column);
-		}
+		{ return static_cast<List_dir*>(m_active_column); }
 
 		List_dir::Dir_cursor get_begin_cursor() const;
 		void set_cursor(List_dir::Dir_cursor cursor);
 		void set_cursor(List_dir::Dir_cursor cursor,
-			boost::system::error_code& ec) noexcept;
+						boost::system::error_code& ec) noexcept;
 
 	private:
 		void build_columns(int ncols);
+		void instantiate_columns(int ncols);
+		void init_column_paths(int ncols);
+
 		void update_paths(boost::filesystem::path path);
 
-		void add_column(const boost::filesystem::path& path,
-			const Type_factory::Handler& closure);
-		void add_column(boost::filesystem::path&& path,
-			const Type_factory::Handler& closure);
-		void add_column(const boost::filesystem::path& path,
-			const Type_factory::Handler& closure,
-			unsigned inplace_col);
+		void add_column(const Type_factory::Handler& closure);
+		void add_column(const boost::filesystem::path& p,
+						const Type_factory::Handler& closure);
 
 		inline void activate_last_column()
-		{
-			m_active_column = m_columns.back().get();
-		}
+		{ m_active_column = m_columns.back().get(); }
 
 		inline const boost::filesystem::path* get_last_column_path() const;
 

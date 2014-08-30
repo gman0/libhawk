@@ -135,7 +135,6 @@ void Tab::set_cursor(List_dir::Dir_cursor cursor)
 	activate_last_column();
 
 	List_dir* ld = get_active_ld();
-
 	if (ld->empty())
 		return;
 
@@ -145,7 +144,6 @@ void Tab::set_cursor(List_dir::Dir_cursor cursor)
 	// add new preview column if we need to
 
 	Type_factory::Handler closure = m_type_factory->get_handler(cursor->path);
-
 	if (closure)
 	{
 		add_column(cursor->path, closure);
@@ -170,25 +168,40 @@ void Tab::set_cursor(List_dir::Dir_cursor cursor,
 
 void Tab::build_columns(int ncols)
 {
+	instantiate_columns(ncols);
+	init_column_paths(ncols);
+
+	// Rock and roll!
+	using Column_ptr = std::unique_ptr<Column>;
+	std::for_each(m_columns.begin(), m_columns.end(),
+				  [](Column_ptr& col) { col->ready(); }
+	);
+
+	activate_last_column();
+	update_active_cursor();
+}
+
+void Tab::instantiate_columns(int ncols)
+{
+	add_column(m_list_dir_closure);
+	for (int i = 1; i < ncols; i++)
+	{
+		add_column(m_list_dir_closure);
+		m_columns[i - 1]->_set_next_column(m_columns[i].get());
+	}
+}
+
+void Tab::init_column_paths(int ncols)
+{
 	static std::vector<path> path_vec;
 	path_vec.clear();
 
 	path p = m_path;
 	dissect_path(p, ncols, path_vec);
 
-	for (int i = 0; i < ncols; i++)
-	{
-		add_column(std::move(path_vec[i]));
-	}
-
-	auto it = m_columns.cbegin();
-	for (int i = 0; i < ncols; i++)
-	{
-		m_columns[i]->_set_next_column( (++it)->get() );
-	}
-
-	activate_last_column();
-	update_active_cursor();
+	--ncols;
+	for (; ncols >= 0; ncols--)
+		m_columns[ncols]->set_path(path_vec[ncols]);
 }
 
 void Tab::update_paths(path p)
@@ -198,7 +211,7 @@ void Tab::update_paths(path p)
 	m_columns[ncols]->set_path(p);
 	for (int i = ncols - 1; i >= 0; i--)
 	{
-		p = std::move(p.parent_path());
+		p = p.parent_path();
 		m_columns[i]->set_path(p);
 	}
 }
@@ -212,32 +225,24 @@ void Tab::remove_column()
 	m_columns.erase(m_columns.begin());
 }
 
-void Tab::add_column(const path& p)
+void Tab::add_column(const Type_factory::Handler& closure)
 {
-	add_column(p, m_list_dir_closure);
+	m_columns.emplace_back(closure());
 }
 
-void Tab::add_column(path&& p)
+void Tab::add_column(const path& p, const Type_factory::Handler& closure)
 {
-	add_column(std::move(p), m_list_dir_closure);
-}
+	add_column(closure);
+	Column* last = m_columns.back().get();
 
-void Tab::add_column(const path& p,
-	const Type_factory::Handler& closure)
-{
-	m_columns.emplace_back(closure(p));
-}
+	if (m_columns.size() >= 2)
+	{
+		// end() - 2 = next to the last
+		m_columns[m_columns.size() - 2]->_set_next_column(last);
+	}
 
-void Tab::add_column(path&& p,
-	const Type_factory::Handler& closure)
-{
-	m_columns.emplace_back(closure(p));
-}
-
-void Tab::add_column(const path& p,
-	const Type_factory::Handler& closure, unsigned inplace_col)
-{
-	m_columns[inplace_col].reset(closure(p));
+	last->set_path(p);
+	last->ready();
 }
 
 void Tab::update_active_cursor()
