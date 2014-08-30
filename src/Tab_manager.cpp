@@ -20,7 +20,7 @@
 #include <utility>
 #include <exception>
 #include "Tab_manager.h"
-#include "handlers/List_dir_hash_extern.h"
+#include "handlers/List_dir_hash.h"
 
 namespace hawk {
 
@@ -29,7 +29,7 @@ Tab_manager::Tab_manager(Type_factory* tf, unsigned ncols)
 	m_type_factory{tf},
 	m_ncols{ncols}
 {
-	m_list_dir_closure = (*tf)[get_handler_hash<List_dir>()];
+	m_list_dir_closure = tf->get_handler(hash_list_dir());
 
 	if (!m_list_dir_closure)
 		throw std::logic_error { "No List_dir handler registered" };

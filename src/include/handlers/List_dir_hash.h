@@ -20,20 +20,8 @@
 #ifndef HAWK_LIST_DIR_HASH_H
 #define HAWK_LIST_DIR_HASH_H
 
-#include <functional>
-#include "handlers/List_dir.h"
-#include "handlers/hash.h"
-#include "calchash.h"
-
-static std::string type { "inode/directory" };
-static size_t hash = hawk::calculate_mime_hash(type);
-
 namespace hawk {
-	template <>
-	size_t get_handler_hash<List_dir>()
-	{
-		return hash;
-	}
+	unsigned long hash_list_dir();
 }
 
 #endif // HAWK_LIST_DIR_HASH_H

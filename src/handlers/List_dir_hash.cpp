@@ -17,13 +17,18 @@
 	along with libhawk.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef HAWK_LIST_DIR_HASH_EXTERN_H
-#define HAWK_LIST_DIR_HASH_EXTERN_H
-
-#include "handlers/hash.h"
+#include <functional>
+#include "handlers/List_dir.h"
+#include "calchash.h"
 
 namespace hawk {
-	extern template size_t get_handler_hash<List_dir>();
+
+static std::string type { "inode/directory" };
+static size_t hash = hawk::calculate_mime_hash(type);
+
+size_t hash_list_dir()
+{
+	return hash;
 }
 
-#endif // HAWK_LIST_DIR_HASH_EXTERN_H
+} // namespace hawk

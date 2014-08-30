@@ -64,11 +64,8 @@ Type_factory::Type_factory()
 	if (!m_magic_guard->magic_cookie)
 	{
 		delete m_magic_guard;
-		throw std::runtime_error
-			{
-				std::string {"Cannot load magic database: "}
-					+ magic_error(m_magic_guard->magic_cookie)
-			};
+		throw std::runtime_error { std::string {"Cannot load magic database: "}
+								  + magic_error(m_magic_guard->magic_cookie) };
 	}
 }
 
