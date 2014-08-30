@@ -20,18 +20,15 @@
 #ifndef HAWK_TAB_H
 #define HAWK_TAB_H
 
-#include <boost/filesystem/path.hpp>
 #include <vector>
-#include <utility>
 #include <memory>
-#include "Column.h"
+#include <boost/filesystem/path.hpp>
 #include "Type_factory.h"
 #include "handlers/List_dir.h"
-#include "handlers/List_dir_hash_extern.h"
 
 namespace hawk {
-	class Type_factory;
 	class Cursor_cache;
+	class Column;
 
 	class Tab
 	{
@@ -42,7 +39,7 @@ namespace hawk {
 		boost::filesystem::path m_path;
 
 		Column_vector m_columns;
-		Column* m_active_column;
+		List_dir* m_active_ld;
 
 		Type_factory* m_type_factory;
 		Type_factory::Handler m_list_dir_closure;
@@ -71,28 +68,14 @@ namespace hawk {
 
 		const boost::filesystem::path& get_path() const;
 		void set_path(boost::filesystem::path path);
-		void set_path(const boost::filesystem::path& path,
-			boost::system::error_code& ec) noexcept;
 
-		// Removes the leftmost column.
+		// Removes the leftmost (first) column.
 		void remove_column();
 
-		Column_vector& get_columns();
 		const Column_vector& get_columns() const;
+		List_dir* const get_active_list_dir() const;
 
-		Column* get_active_column() { return m_active_column; }
-		const Column* get_active_column() const { return m_active_column; }
-		// don't confuse this with the size of column vector
-		int get_current_ncols();
-
-		// Get List_dir handler of the active column.
-		List_dir* get_active_ld()
-		{ return static_cast<List_dir*>(m_active_column); }
-
-		List_dir::Dir_cursor get_begin_cursor() const;
 		void set_cursor(List_dir::Dir_cursor cursor);
-		void set_cursor(List_dir::Dir_cursor cursor,
-						boost::system::error_code& ec) noexcept;
 
 	private:
 		void build_columns(int ncols);
@@ -105,12 +88,8 @@ namespace hawk {
 		void add_column(const boost::filesystem::path& p,
 						const Type_factory::Handler& closure);
 
-		inline void activate_last_column()
-		{ m_active_column = m_columns.back().get(); }
-
-		inline const boost::filesystem::path* get_last_column_path() const;
-
 		void update_active_cursor();
+		void activate_last_column();
 	};
 }
 

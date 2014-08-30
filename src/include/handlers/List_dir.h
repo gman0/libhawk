@@ -80,8 +80,6 @@ namespace hawk {
 		Dir_vector& get_contents() { return m_dir_items; }
 		const Dir_vector& get_contents() const { return m_dir_items; }
 
-		inline bool empty() const { return m_dir_items.empty(); }
-
 		Dir_cursor get_cursor() const { return m_cursor; }
 		Dir_vector::const_iterator get_const_cursor() const
 			{ return m_cursor; }
@@ -90,8 +88,6 @@ namespace hawk {
 		void set_cursor(const boost::filesystem::path& cursor);
 
 		virtual void set_path(const boost::filesystem::path& path);
-		void set_path(const boost::filesystem::path& path,
-			boost::system::error_code& ec) noexcept;
 
 		// (see m_implicit_cursor member)
 		inline bool implicit_cursor() const { return m_implicit_cursor; }

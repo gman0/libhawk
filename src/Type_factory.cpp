@@ -19,6 +19,7 @@
 
 #include <algorithm>
 #include <exception>
+#include <magic.h>
 #include "Type_factory.h"
 #include "calchash.h"
 
@@ -28,31 +29,52 @@ constexpr int half_size_t = sizeof(size_t) * 4;
 
 namespace hawk {
 
-Type_factory::Magic_guard::Magic_guard()
-{
-	magic_cookie = magic_open(MAGIC_MIME_TYPE
-							// follow the symlinks
-							| MAGIC_SYMLINK
-							// don't look for known tokens in ASCII files
-							| MAGIC_NO_CHECK_TOKENS);
-	magic_load(magic_cookie, nullptr);
-}
+using Type_map = std::unordered_map<size_t, Type_factory::Handler, No_hash>;
 
-Type_factory::Magic_guard::~Magic_guard()
+struct Magic_guard
 {
-	magic_close(magic_cookie);
+	magic_t magic_cookie;
+
+	Magic_guard()
+	{
+		magic_cookie =
+				magic_open(MAGIC_MIME_TYPE
+						   | MAGIC_SYMLINK
+						   | MAGIC_NO_CHECK_TOKENS);
+		magic_load(magic_cookie, nullptr);
+	}
+
+	~Magic_guard()
+	{
+		magic_close(magic_cookie);
+	}
+};
+
+static bool find_predicate(const Type_map::value_type& v,
+		size_t find)
+{
+	constexpr int half_size_t = sizeof(size_t) * 4;
+	return (v.first >> half_size_t) == ((v.first >> half_size_t)
+			& (find >> half_size_t));
 }
 
 Type_factory::Type_factory()
+	: m_magic_guard{new Magic_guard}
 {
-	if (!m_magic_guard.magic_cookie)
+	if (!m_magic_guard->magic_cookie)
 	{
+		delete m_magic_guard;
 		throw std::runtime_error
 			{
 				std::string {"Cannot load magic database: "}
-					+ magic_error(m_magic_guard.magic_cookie)
+					+ magic_error(m_magic_guard->magic_cookie)
 			};
 	}
+}
+
+Type_factory::~Type_factory()
+{
+	delete m_magic_guard;
 }
 
 void Type_factory::register_type(size_t type,
@@ -103,7 +125,7 @@ Type_factory::Handler Type_factory::get_handler(
 
 const char* Type_factory::get_mime(const path& p)
 {
-	return magic_file(m_magic_guard.magic_cookie, p.c_str());
+	return magic_file(m_magic_guard->magic_cookie, p.c_str());
 }
 
 size_t Type_factory::get_hash_type(const path& p)

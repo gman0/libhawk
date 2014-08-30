@@ -25,53 +25,38 @@
 #include <vector>
 #include <utility>
 #include <boost/filesystem/path.hpp>
-#include <magic.h>
 #include "No_hash.h"
 #include "Column.h"
 
 namespace hawk {
+	struct Magic_guard;
+
 	class Type_factory
 	{
 	public:
 		using Handler = std::function<Column*()>;
 
 	private:
-		using Type_map =
-			std::unordered_map<size_t, Handler, No_hash>;
-
-		Type_map m_types;
-
-		struct Magic_guard
-		{
-			magic_t magic_cookie;
-
-			Magic_guard();
-			~Magic_guard();
-		} m_magic_guard;
+		Magic_guard* m_magic_guard;
+		std::unordered_map<size_t, Handler, No_hash> m_types;
 
 	public:
 		Type_factory();
+		~Type_factory();
 		Type_factory(const Type_factory&) = delete;
 
 		void register_type(size_t type, const Handler& tp);
 
+		// Returns a handler for supplied hash or deduced file type.
 		Handler operator[](size_t type);
 		Handler operator[](const boost::filesystem::path& p);
 
+		// The same as for operator[]'s.
 		Handler get_handler(size_t type);
 		Handler get_handler(const boost::filesystem::path& p);
 
 		const char* get_mime(const boost::filesystem::path& p);
 		size_t get_hash_type(const boost::filesystem::path& p);
-
-	private:
-		static inline bool find_predicate(const Type_map::value_type& v,
-				size_t find)
-		{
-			constexpr int half_size_t = sizeof(size_t) * 4;
-			return (v.first >> half_size_t) == ((v.first >> half_size_t)
-					& (find >> half_size_t));
-		}
 	};
 }
 

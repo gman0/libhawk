@@ -23,6 +23,7 @@
 #include <exception>
 #include "Tab.h"
 #include "Cursor_cache.h"
+#include "Column.h"
 
 using namespace boost::filesystem;
 
@@ -87,39 +88,14 @@ void Tab::set_path(path p)
 	m_path = std::move(p);
 }
 
-void Tab::set_path(const path& p,
-	boost::system::error_code& ec) noexcept
-{
-	try {
-		set_path(p);
-	}
-	catch (const boost::filesystem::filesystem_error& e)
-	{
-		ec = e.code();
-	}
-}
-
-Tab::Column_vector& Tab::get_columns()
-{
-	return m_columns;
-}
-
 const Tab::Column_vector& Tab::get_columns() const
 {
 	return m_columns;
 }
 
-int Tab::get_current_ncols()
+List_dir* const Tab::get_active_list_dir() const
 {
-	int ncols = m_columns.size();
-	return (m_has_preview ? (ncols - 2) : --ncols);
-}
-
-List_dir::Dir_cursor Tab::get_begin_cursor() const
-{
-	List_dir* ld =
-		static_cast<List_dir*>(m_active_column);
-	return ld->get_contents().begin();
+	return m_active_ld;
 }
 
 void Tab::set_cursor(List_dir::Dir_cursor cursor)
@@ -134,8 +110,8 @@ void Tab::set_cursor(List_dir::Dir_cursor cursor)
 	// reset the active column
 	activate_last_column();
 
-	List_dir* ld = get_active_ld();
-	if (ld->empty())
+	List_dir* ld = get_active_list_dir();
+	if (ld->get_contents().empty())
 		return;
 
 	// set the cursor in the active column
@@ -148,21 +124,6 @@ void Tab::set_cursor(List_dir::Dir_cursor cursor)
 	{
 		add_column(cursor->path, closure);
 		m_has_preview = true;
-	}
-}
-
-void Tab::set_cursor(List_dir::Dir_cursor cursor,
-	boost::system::error_code& ec) noexcept
-{
-	try
-	{
-		set_cursor(cursor);
-	}
-	catch (const filesystem_error& e)
-	{
-		ec = e.code();
-		m_columns.erase(--m_columns.end());
-		m_has_preview = false;
 	}
 }
 
@@ -206,7 +167,12 @@ void Tab::init_column_paths(int ncols)
 
 void Tab::update_paths(path p)
 {
-	int ncols = get_current_ncols();
+	int ncols = m_columns.size();
+
+	if (m_has_preview)
+		ncols -= 2;
+	else
+		--ncols;
 
 	m_columns[ncols]->set_path(p);
 	for (int i = ncols - 1; i >= 0; i--)
@@ -247,15 +213,12 @@ void Tab::add_column(const path& p, const Type_factory::Handler& closure)
 
 void Tab::update_active_cursor()
 {
-	List_dir* active_handler =
-		static_cast<List_dir*>(m_active_column);
-
-	set_cursor(active_handler->get_cursor());
+	set_cursor(m_active_ld->get_cursor());
 }
 
-const boost::filesystem::path* Tab::get_last_column_path() const
+void Tab::activate_last_column()
 {
-	return &(m_columns.back()->get_path());
+	m_active_ld = static_cast<List_dir*>(m_columns.back().get());
 }
 
 } // namespace hawk
