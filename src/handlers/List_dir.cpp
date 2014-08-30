@@ -158,7 +158,7 @@ void List_dir::set_path(const path& dir)
 {
 	if (dir.empty())
 	{
-		m_path = nullptr;
+		m_path.clear();
 		m_dir_items.clear();
 		m_path_hash = 0;
 
