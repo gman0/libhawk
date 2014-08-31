@@ -26,6 +26,27 @@ using namespace boost::filesystem;
 
 namespace hawk {
 
+Column::Column(Column&& col) noexcept
+	:
+	  m_path{std::move(col.m_path)},
+	  m_next_column{col.m_next_column}
+{
+	col.m_next_column = nullptr;
+}
+
+Column& Column::operator=(Column&& col) noexcept
+{
+	if (&col == this)
+		return *this;
+
+	m_path = std::move(col.m_path);
+	m_next_column = col.m_next_column;
+
+	col.m_next_column = nullptr;
+
+	return *this;
+}
+
 void Column::_set_next_column(const Column* next_column)
 {
 	m_next_column = next_column;

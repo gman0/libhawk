@@ -36,22 +36,14 @@ namespace hawk {
 		const Column* m_next_column;
 
 	public:
-		Column() : m_next_column{}
-		{}
-
-		Column(const boost::filesystem::path& path)
-			:
-			  m_path{path},
-			  m_next_column{}
-		{}
-
-		Column(boost::filesystem::path&& path)
-			:
-			  m_path{std::move(path)},
-			  m_next_column{}
-		{}
-
+		Column() : m_next_column{nullptr} {}
 		virtual ~Column() = default;
+
+		Column(const Column&) = delete;
+		Column& operator=(const Column&) = delete;
+
+		Column(Column&& col) noexcept;
+		Column& operator=(Column&&) noexcept;
 
 		// For internal/expert use only.
 		void _set_next_column(const Column* next_column);
@@ -59,6 +51,8 @@ namespace hawk {
 		const boost::filesystem::path& get_path() const;
 		virtual void set_path(const boost::filesystem::path& path);
 
+		// (internally called by hawk::Tab, this method
+		// should not be called from user code)
 		// This method is called after the Column has been
 		// successfully created, the path has been set and
 		// is ready to use.
