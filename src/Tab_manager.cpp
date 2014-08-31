@@ -22,7 +22,20 @@
 #include "Tab_manager.h"
 #include "handlers/List_dir_hash.h"
 
+using boost::filesystem::path;
+
 namespace hawk {
+
+using Tab_iterator = Tab_manager::Tab_list::iterator;
+
+static Tab* get_tab_ptr(Tab_iterator& prev, Tab_iterator& curr)
+{
+	// Return nullptr if the Tab construction failed.
+	if (prev == curr)
+		return nullptr;
+	else
+		return &(*curr);
+}
 
 Tab_manager::Tab_manager(Type_factory* tf, unsigned ncols)
 	:
@@ -35,56 +48,21 @@ Tab_manager::Tab_manager(Type_factory* tf, unsigned ncols)
 		throw std::logic_error { "No List_dir handler registered" };
 }
 
-Tab_manager::Tab_iterator& Tab_manager::get_active_tab()
+Tab* Tab_manager::add_tab(const path& pwd, Cursor_cache* cc)
 {
-	return m_active_tab;
-}
-
-void Tab_manager::set_active_tab(Tab_manager::Tab_iterator& tab)
-{
-	m_active_tab = tab;
-}
-
-void Tab_manager::set_active_tab(Tab_manager::Tab_iterator&& tab)
-{
-	m_active_tab = std::move(tab);
-}
-
-Tab_manager::Tab_iterator& Tab_manager::add_tab(Cursor_cache* cc)
-{
-	m_tabs.emplace_back(m_active_tab->get_path(), cc, m_ncols,
-						m_type_factory, m_list_dir_closure);
-	return (m_active_tab = --m_tabs.end());
-}
-
-Tab_manager::Tab_iterator& Tab_manager::add_tab(
-		const boost::filesystem::path& pwd, Cursor_cache* cc)
-{
+	Tab_iterator it = --m_tabs.end();
 	m_tabs.emplace_back(pwd, cc, m_ncols, m_type_factory, m_list_dir_closure);
-	return (m_active_tab = --m_tabs.end());
+
+	return get_tab_ptr(it, --m_tabs.end());
 }
 
-Tab_manager::Tab_iterator& Tab_manager::add_tab(
-		boost::filesystem::path&& pwd, Cursor_cache* cc)
+Tab* Tab_manager::add_tab(path&& pwd, Cursor_cache* cc)
 {
-	m_tabs.emplace_back(
-			std::move(pwd), cc, m_ncols, m_type_factory, m_list_dir_closure);
-	return (m_active_tab = --m_tabs.end());
-}
+	Tab_iterator it = --m_tabs.end();
+	m_tabs.emplace_back(std::move(pwd), cc, m_ncols, m_type_factory,
+						m_list_dir_closure);
 
-void Tab_manager::remove_tab(Tab_manager::Tab_iterator& tab)
-{
-	if (m_tabs.size() <= 1) return; // don't delete our only tab!
-
-	// if we're deleting the first tab, make the next one active,
-	// otherwise the previouse one will be active
-	m_active_tab = (tab == m_tabs.begin()) ? tab++ : tab--;
-	m_tabs.erase(tab);
-}
-
-int Tab_manager::count() const
-{
-	return m_tabs.size();
+	return get_tab_ptr(it, --m_tabs.end());
 }
 
 } // namespace hawk

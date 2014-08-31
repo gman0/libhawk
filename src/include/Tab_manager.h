@@ -29,11 +29,10 @@ namespace hawk {
 	class Tab_manager
 	{
 	public:
-		using Tab_iterator = typename std::list<Tab>::iterator;
+		using Tab_list = std::list<Tab>;
 
 	private:
-		std::list<Tab> m_tabs;
-		Tab_iterator m_active_tab;
+		Tab_list m_tabs;
 
 		Type_factory* m_type_factory;
 		Type_factory::Handler m_list_dir_closure;
@@ -46,17 +45,11 @@ namespace hawk {
 		Tab_manager(const Tab_manager&) = delete;
 		Tab_manager& operator=(const Tab_manager&) = delete;
 
-		Tab_iterator& get_active_tab();
-		void set_active_tab(Tab_iterator& tab);
-		void set_active_tab(Tab_iterator&& tab);
+		// These can return nullptr if the tab construction fails.
+		Tab* add_tab(const boost::filesystem::path& pwd, Cursor_cache* cc);
+		Tab* add_tab(boost::filesystem::path&& pwd, Cursor_cache* cc);
 
-		Tab_iterator& add_tab(Cursor_cache* cc);
-		Tab_iterator& add_tab(const boost::filesystem::path& pwd,
-							  Cursor_cache* cc);
-		Tab_iterator& add_tab(boost::filesystem::path&& pwd,
-							  Cursor_cache* cc);
-		void remove_tab(Tab_iterator& tab);
-		int  count() const;
+		Tab_list& get_tabs();
 	};
 }
 
