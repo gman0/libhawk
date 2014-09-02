@@ -75,17 +75,48 @@ const path& Tab::get_path() const
 
 void Tab::set_path(path p)
 {
-	if (p.empty()) return;
+	static struct
+	{
+		path prev_path;
+		char fail_level = 0;
+		std::exception_ptr eptr;
+	} err;
 
-	p = canonical(p, m_path);
+	try
+	{
+		p = canonical(p, m_path);
+		if (p.empty())
+			p = "/";
 
-	if (p.empty())
-		p = "/";
+		update_paths(p);
+	}
+	catch (...)
+	{
+		if (err.fail_level == 0)
+		{
+			++err.fail_level;
+			err.prev_path = std::move(m_path);
+			err.eptr = std::current_exception();
 
-	update_paths(p);
+			set_path(err.prev_path);
+		}
+		else
+		{
+			err.fail_level = 2;
+			err.prev_path = err.prev_path.parent_path();
+
+			set_path(err.prev_path);
+		}
+	}
+
 	update_active_cursor();
-
 	m_path = std::move(p);
+
+	if (err.fail_level)
+	{
+		err.fail_level = 0;
+		std::rethrow_exception(err.eptr);
+	}
 }
 
 const Tab::Column_vector& Tab::get_columns() const
@@ -100,43 +131,42 @@ List_dir* const Tab::get_active_list_dir() const
 
 void Tab::set_cursor(List_dir::Dir_cursor cursor)
 {
-	// remove current preview column (if any)
-	if (m_has_preview)
-	{
-		m_columns.pop_back();
-		m_has_preview = false;
-	}
+	// Remove the preview column if there's one.
+	remove_preview();
 
-	// reset the active column
+	// Reset the active column.
 	activate_last_column();
 
-	List_dir* ld = get_active_list_dir();
-	if (ld->get_contents().empty())
-		return;
-
-	// set the cursor in the active column
-	ld->set_cursor(cursor);
-
-	// add new preview column if we need to
-
-	Type_factory::Handler closure = m_type_factory->get_handler(cursor->path);
-	if (closure)
+	if (!m_active_ld->get_contents().empty())
 	{
-		add_column(cursor->path, closure);
-		m_has_preview = true;
+		// Set the cursor in the active column.
+		m_active_ld->set_cursor(cursor);
+		// Add a new preview column if we can.
+		add_preview(cursor->path);
+	}
+}
+
+void Tab::set_cursor(const path& p)
+{
+	// Remove the preview column if there's one.
+	remove_preview();
+
+	// Reset the active column.
+	activate_last_column();
+
+	if (!m_active_ld->get_contents().empty())
+	{
+		// Set the cursor in the active column.
+		m_active_ld->set_cursor(p);
+		// Add a new preview column if we can.
+		add_preview(p);
 	}
 }
 
 void Tab::build_columns(int ncols)
 {
 	instantiate_columns(ncols);
-	init_column_paths(ncols);
-
-	// Rock and roll!
-	using Column_ptr = std::unique_ptr<Column>;
-	std::for_each(m_columns.begin(), m_columns.end(),
-				  [](Column_ptr& col) { col->ready(); }
-	);
+	initialize_columns(ncols);
 
 	activate_last_column();
 	update_active_cursor();
@@ -152,7 +182,7 @@ void Tab::instantiate_columns(int ncols)
 	}
 }
 
-void Tab::init_column_paths(int ncols)
+void Tab::initialize_columns(int ncols)
 {
 	static std::vector<path> path_vec;
 	path_vec.clear();
@@ -162,7 +192,7 @@ void Tab::init_column_paths(int ncols)
 
 	--ncols;
 	for (; ncols >= 0; ncols--)
-		m_columns[ncols]->set_path(path_vec[ncols]);
+		ready_column(m_columns[ncols], path_vec[ncols]);
 }
 
 void Tab::update_paths(path p)
@@ -182,33 +212,15 @@ void Tab::update_paths(path p)
 	}
 }
 
-void Tab::remove_column()
-{
-	// let's leave at least 1 column
-	if (m_columns.size() == 1)
-		return;
-
-	m_columns.erase(m_columns.begin());
-}
-
 void Tab::add_column(const Type_factory::Handler& closure)
 {
 	m_columns.emplace_back(closure());
 }
 
-void Tab::add_column(const path& p, const Type_factory::Handler& closure)
+void Tab::ready_column(Column_ptr& col, const path& p)
 {
-	add_column(closure);
-	Column* last = m_columns.back().get();
-
-	if (m_columns.size() >= 2)
-	{
-		// end() - 2 = next to the last
-		m_columns[m_columns.size() - 2]->_set_next_column(last);
-	}
-
-	last->set_path(p);
-	last->ready();
+	col->set_path(p);
+	col->ready();
 }
 
 void Tab::update_active_cursor()
@@ -219,6 +231,36 @@ void Tab::update_active_cursor()
 void Tab::activate_last_column()
 {
 	m_active_ld = static_cast<List_dir*>(m_columns.back().get());
+}
+
+void Tab::add_preview(const path& p)
+{
+	Type_factory::Handler closure = m_type_factory->get_handler(p);
+
+	if (!closure)
+		return;
+
+	add_column(closure);
+
+	try
+	{
+		m_has_preview = true;
+		ready_column(m_columns.back(), p);
+	}
+	catch (...)
+	{
+		remove_preview();
+		throw;
+	}
+}
+
+void Tab::remove_preview()
+{
+	if (m_has_preview)
+	{
+		m_columns.pop_back();
+		m_has_preview = false;
+	}
 }
 
 } // namespace hawk

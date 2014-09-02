@@ -30,10 +30,34 @@ namespace hawk {
 	class Cursor_cache;
 	class Column;
 
+	/// Exception safety
+	//  User's code can safely throw exceptions with these guarantees:
+	//   * throwing an exception during Tab initialization (ie. when
+	//     calling build_columns - where the user code being the
+	//     constructor of a class inherting from Column, set_path virtual
+	//     method and ready pure virtual method) causes the Tab to cease
+	//     its construction,
+	//   * throwing an exception while creating a preview column
+	//     (ie. constructor, set_path, ready) causes the preview column
+	//     to cease its construction,
+	//   * throwing an exception while setting Tab path by calling set_path
+	//     (which subsequently calls set_path of every Column) causes the
+	//     path to be reset to its previous value. If this call fails again
+	//     by throwing an exception, the parent path of current path will
+	//     be used - this will continue in a loop until call to set_path
+	//     succeeds (thus the path may end up being "/").
+	//
+	//  Any exception thrown in any of these scenarios will be rethrown back
+	//  to the user.
+
+	// Notice about Column building: when calling build_columns during
+	// Tab construction, Column constructors are called in forward order
+	// but their ready methods are called in reverse.
 	class Tab
 	{
 	public:
-		using Column_vector = std::vector<std::unique_ptr<Column>>;
+		using Column_ptr = std::unique_ptr<Column>;
+		using Column_vector = std::vector<Column_ptr>;
 
 	private:
 		boost::filesystem::path m_path;
@@ -69,27 +93,29 @@ namespace hawk {
 		const boost::filesystem::path& get_path() const;
 		void set_path(boost::filesystem::path path);
 
-		// Removes the leftmost (first) column.
-		void remove_column();
-
 		const Column_vector& get_columns() const;
 		List_dir* const get_active_list_dir() const;
 
 		void set_cursor(List_dir::Dir_cursor cursor);
+		void set_cursor(const boost::filesystem::path& path);
 
 	private:
 		void build_columns(int ncols);
 		void instantiate_columns(int ncols);
-		void init_column_paths(int ncols);
+		void initialize_columns(int ncols);
 
 		void update_paths(boost::filesystem::path path);
-
-		void add_column(const Type_factory::Handler& closure);
-		void add_column(const boost::filesystem::path& p,
-						const Type_factory::Handler& closure);
-
 		void update_active_cursor();
 		void activate_last_column();
+
+		void add_column(const Type_factory::Handler& closure);
+		// Sets column's path and calls its ready().
+		void ready_column(Column_ptr& col, const boost::filesystem::path& path);
+
+		// Has no effect when no handler exists for such file type.
+		void add_preview(const boost::filesystem::path& path);
+		// Has no effect when there's no preview column.
+		void remove_preview();
 	};
 }
 
