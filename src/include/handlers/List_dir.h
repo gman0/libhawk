@@ -43,6 +43,7 @@ namespace hawk {
 
 		using Dir_vector = std::vector<Dir_entry>;
 		using Dir_cursor = Dir_vector::iterator;
+		using Dir_const_cursor = Dir_vector::const_iterator;
 
 	private:
 		Cursor_cache* m_cursor_cache;
@@ -51,7 +52,7 @@ namespace hawk {
 		// which will be used as a key in m_cursor_cache.
 		size_t m_path_hash;
 
-		// This flag stores the type of cursor aquisition:
+		// This flag stores the type of cursor acquisition:
 		//  * implicit (true) - acquired as begin/end cursor
 		//  * explicit - everything else
 		//
@@ -60,7 +61,7 @@ namespace hawk {
 		// will point to a different item, thus we need a way to
 		// inform the user about this.
 		bool m_implicit_cursor;
-
+	protected:
 		Dir_vector m_dir_items;
 		Dir_cursor m_cursor;
 
@@ -81,16 +82,25 @@ namespace hawk {
 		const Dir_vector& get_contents() const { return m_dir_items; }
 
 		Dir_cursor get_cursor() const { return m_cursor; }
-		Dir_vector::const_iterator get_const_cursor() const
-			{ return m_cursor; }
+		Dir_const_cursor get_const_cursor() const { return m_cursor; }
+
+		// These two methods try to find a cursor with supplied filename.
+		// (Note that by filename I mean filename by calling eg.
+		// boost::filesystem::path's filename() method.)
+		// On success, the resulting cursor is stored in cur and
+		// true is returned.
+		bool try_get_cursor(const boost::filesystem::path& filename,
+							Dir_cursor& cur);
+		bool try_get_const_cursor(const boost::filesystem::path& filename,
+								  Dir_const_cursor& cur);
 
 		void set_cursor(Dir_cursor cursor);
-		void set_cursor(const boost::filesystem::path& cursor);
+		void set_cursor(const boost::filesystem::path& filename);
 
 		virtual void set_path(const boost::filesystem::path& path);
 
 		// (see m_implicit_cursor member)
-		inline bool implicit_cursor() const { return m_implicit_cursor; }
+		bool implicit_cursor() const { return m_implicit_cursor; }
 
 	private:
 		void read_directory();

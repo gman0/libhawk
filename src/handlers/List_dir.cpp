@@ -53,14 +53,25 @@ static void gather_dir_contents(const path& p, List_dir::Dir_vector& out)
 	}
 }
 
-static List_dir::Dir_cursor match_cursor(List_dir::Dir_vector& vec,
-										 size_t match_hash)
+// Checks for absolute paths.
+static List_dir::Dir_cursor match_cursor_absolute(List_dir::Dir_vector& vec,
+												  size_t match_hash)
 {
 	return std::find_if(vec.begin(), vec.end(),
 				[match_hash](const List_dir::Dir_entry& dir_ent)
-				{
-					return (hash_value(dir_ent.path) == match_hash);
-				});
+				{ return (hash_value(dir_ent.path) == match_hash); });
+}
+
+// Checks for filenames only.
+static List_dir::Dir_cursor match_cursor_filename(List_dir::Dir_vector& vec,
+												 const path& filename)
+{
+	size_t hash = hash_value(filename);
+	const auto predicate =
+			[hash](const List_dir::Dir_entry& ent)
+			{ return (hash_value(ent.path.filename())) == hash; };
+
+	return std::find_if(vec.begin(), vec.end(), predicate);
 }
 
 List_dir::List_dir(List_dir&& ld) noexcept
@@ -108,7 +119,7 @@ bool List_dir::acquire_cursor()
 {
 	if (m_next_column)
 	{
-		set_cursor(*get_next_path());
+		set_cursor(get_next_path()->filename());
 		return false;
 	}
 
@@ -119,7 +130,7 @@ bool List_dir::acquire_cursor()
 		// Ok, so we DID find the hash of the cursor,
 		// now let's assign it to the correct Dir_vector
 		// item if we can.
-		m_cursor = match_cursor(m_dir_items, cursor_hash_it->second);
+		m_cursor = match_cursor_absolute(m_dir_items, cursor_hash_it->second);
 
 		if (m_cursor != m_dir_items.end())
 			return false;
@@ -144,14 +155,35 @@ void List_dir::set_cursor(List_dir::Dir_cursor cursor)
 	m_implicit_cursor = false;
 }
 
-void List_dir::set_cursor(const path& cur)
+void List_dir::set_cursor(const path& filename)
 {
-	Dir_cursor cursor = match_cursor(m_dir_items, hash_value(cur));
+	Dir_cursor cursor = match_cursor_filename(m_dir_items, filename);
 
 	if (cursor != m_dir_items.end())
 		set_cursor(cursor);
 	else
 		set_cursor(m_dir_items.begin());
+}
+
+bool List_dir::try_get_cursor(const boost::filesystem::path& filename,
+							  List_dir::Dir_cursor& cur)
+{
+	cur = match_cursor_filename(m_dir_items, filename);
+
+	if (cur != m_dir_items.end())
+		return true;
+	else
+		return false;
+}
+
+bool List_dir::try_get_const_cursor(const boost::filesystem::path& filename,
+									List_dir::Dir_const_cursor& cur)
+{
+	List_dir::Dir_cursor c;
+	bool ret = try_get_cursor(filename, c);
+	cur = c;
+
+	return ret;
 }
 
 void List_dir::set_path(const path& dir)
