@@ -129,7 +129,7 @@ List_dir* const Tab::get_active_list_dir() const
 	return m_active_ld;
 }
 
-void Tab::set_cursor(List_dir::Dir_cursor cursor)
+void Tab::set_cursor(Dir_cursor cursor)
 {
 	if (prepare_cursor())
 	{

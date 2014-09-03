@@ -96,7 +96,7 @@ namespace hawk {
 		const Column_vector& get_columns() const;
 		List_dir* const get_active_list_dir() const;
 
-		void set_cursor(List_dir::Dir_cursor cursor);
+		void set_cursor(Dir_cursor cursor);
 		void set_cursor(const boost::filesystem::path& path);
 
 	private:

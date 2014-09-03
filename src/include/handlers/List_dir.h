@@ -27,24 +27,13 @@
 #include <boost/filesystem.hpp>
 #include "Column.h"
 #include "No_hash.h"
+#include "Dir_cache.h"
 
 namespace hawk {
 	class Cursor_cache;
 
 	class List_dir : public Column
 	{
-	public:
-		struct Dir_entry
-		{
-			std::time_t timestamp;
-			boost::filesystem::path path;
-			boost::filesystem::file_status status;
-		};
-
-		using Dir_vector = std::vector<Dir_entry>;
-		using Dir_cursor = Dir_vector::iterator;
-		using Dir_const_cursor = Dir_vector::const_iterator;
-
 	private:
 		Cursor_cache* m_cursor_cache;
 
@@ -62,7 +51,7 @@ namespace hawk {
 		// inform the user about this.
 		bool m_implicit_cursor;
 	protected:
-		Dir_vector m_dir_items;
+		Dir_ptr m_dir_ptr;
 		Dir_cursor m_cursor;
 
 	public:
@@ -78,8 +67,8 @@ namespace hawk {
 		List_dir& operator=(List_dir&& ld) noexcept;
 
 		// Get a reference to the vector of current directory's contents.
-		Dir_vector& get_contents() { return m_dir_items; }
-		const Dir_vector& get_contents() const { return m_dir_items; }
+		Dir_vector& get_contents() { return *m_dir_ptr; }
+		const Dir_vector& get_contents() const { return *m_dir_ptr; }
 
 		Dir_cursor get_cursor() const { return m_cursor; }
 		Dir_const_cursor get_const_cursor() const { return m_cursor; }
@@ -103,7 +92,7 @@ namespace hawk {
 		bool implicit_cursor() const { return m_implicit_cursor; }
 
 	private:
-		void read_directory();
+		void update_dir_cache(const boost::filesystem::path& path);
 
 		// Returns true if the cursor was acquired implicity,
 		// otherwise false.

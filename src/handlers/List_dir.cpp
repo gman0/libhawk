@@ -35,40 +35,21 @@ using namespace boost::filesystem;
 
 namespace hawk {
 
-// Gather contents of a directory and move them to the out vector
-static void gather_dir_contents(const path& p, List_dir::Dir_vector& out)
-{
-	directory_iterator dir_it_end;
-	for (auto dir_it = directory_iterator {p};
-		 dir_it != dir_it_end;
-		 ++dir_it)
-	{
-		List_dir::Dir_entry dir_ent;
-		dir_ent.path = std::move(*dir_it);
-
-		boost::system::error_code ec;
-		dir_ent.status = status(dir_ent.path, ec);
-
-		out.push_back(std::move(dir_ent));
-	}
-}
-
 // Checks for absolute paths.
-static List_dir::Dir_cursor match_cursor_absolute(List_dir::Dir_vector& vec,
+static Dir_cursor match_cursor_absolute(Dir_vector& vec,
 												  size_t match_hash)
 {
 	return std::find_if(vec.begin(), vec.end(),
-				[match_hash](const List_dir::Dir_entry& dir_ent)
+				[match_hash](const Dir_entry& dir_ent)
 				{ return (hash_value(dir_ent.path) == match_hash); });
 }
 
 // Checks for filenames only.
-static List_dir::Dir_cursor match_cursor_filename(List_dir::Dir_vector& vec,
-												 const path& filename)
+static Dir_cursor match_cursor_filename(Dir_vector& vec, const path& filename)
 {
 	size_t hash = hash_value(filename);
 	const auto predicate =
-			[hash](const List_dir::Dir_entry& ent)
+			[hash](const Dir_entry& ent)
 			{ return (hash_value(ent.path.filename())) == hash; };
 
 	return std::find_if(vec.begin(), vec.end(), predicate);
@@ -79,7 +60,7 @@ List_dir::List_dir(List_dir&& ld) noexcept
 	  Column{std::move(ld)},
 	  m_cursor_cache{ld.m_cursor_cache},
 	  m_path_hash{ld.m_path_hash},
-	  m_dir_items{std::move(ld.m_dir_items)},
+	  m_dir_ptr{std::move(ld.m_dir_ptr)},
 	  m_cursor{std::move(ld.m_cursor)}
 {
 	ld.m_path_hash = 0;
@@ -94,7 +75,7 @@ List_dir& List_dir::operator=(List_dir&& ld) noexcept
 	Column::operator=(std::move(ld));
 	m_cursor_cache = ld.m_cursor_cache;
 	m_path_hash = ld.m_path_hash;
-	m_dir_items = std::move(ld.m_dir_items);
+	m_dir_ptr = std::move(ld.m_dir_ptr);
 	m_cursor = std::move(ld.m_cursor);
 	m_implicit_cursor = ld.m_implicit_cursor;
 
@@ -103,16 +84,14 @@ List_dir& List_dir::operator=(List_dir&& ld) noexcept
 	return *this;
 }
 
-void List_dir::read_directory()
+void List_dir::update_dir_cache(const path& p)
 {
-	m_dir_items.clear();
+	m_dir_ptr = get_dir_ptr(p, m_path_hash);
 
 	// Free up some space if we need to.
 	constexpr int cache_max_size = 1024;
-	if (m_dir_items.size() > cache_max_size)
-		m_dir_items.resize(cache_max_size);
-
-	gather_dir_contents(m_path, m_dir_items);
+	if (m_dir_ptr->size() > cache_max_size)
+		m_dir_ptr->resize(cache_max_size);
 }
 
 bool List_dir::acquire_cursor()
@@ -130,25 +109,25 @@ bool List_dir::acquire_cursor()
 		// Ok, so we DID find the hash of the cursor,
 		// now let's assign it to the correct Dir_vector
 		// item if we can.
-		m_cursor = match_cursor_absolute(m_dir_items, cursor_hash_it->second);
+		m_cursor = match_cursor_absolute(*m_dir_ptr, cursor_hash_it->second);
 
-		if (m_cursor != m_dir_items.end())
+		if (m_cursor != m_dir_ptr->end())
 			return false;
 	}
 
 	// We didn't find the cursor, let's use the first
 	// item of our Dir_vector as the cursor (or the
 	// end() iterator if the vector is empty).
-	m_cursor = m_dir_items.begin();
+	m_cursor = m_dir_ptr->begin();
 
 	return true;
 }
 
-void List_dir::set_cursor(List_dir::Dir_cursor cursor)
+void List_dir::set_cursor(Dir_cursor cursor)
 {
 	m_cursor = std::move(cursor);
 
-	if (m_dir_items.empty())
+	if (m_dir_ptr->empty())
 		return;
 
 	m_cursor_cache->store(m_path_hash, hash_value(m_cursor->path));
@@ -157,29 +136,29 @@ void List_dir::set_cursor(List_dir::Dir_cursor cursor)
 
 void List_dir::set_cursor(const path& filename)
 {
-	Dir_cursor cursor = match_cursor_filename(m_dir_items, filename);
+	Dir_cursor cursor = match_cursor_filename(*m_dir_ptr, filename);
 
-	if (cursor != m_dir_items.end())
+	if (cursor != m_dir_ptr->end())
 		set_cursor(cursor);
 	else
-		set_cursor(m_dir_items.begin());
+		set_cursor(m_dir_ptr->begin());
 }
 
 bool List_dir::try_get_cursor(const boost::filesystem::path& filename,
-							  List_dir::Dir_cursor& cur)
+							  Dir_cursor& cur)
 {
-	cur = match_cursor_filename(m_dir_items, filename);
+	cur = match_cursor_filename(*m_dir_ptr, filename);
 
-	if (cur != m_dir_items.end())
+	if (cur != m_dir_ptr->end())
 		return true;
 	else
 		return false;
 }
 
 bool List_dir::try_get_const_cursor(const boost::filesystem::path& filename,
-									List_dir::Dir_const_cursor& cur)
+									Dir_const_cursor& cur)
 {
-	List_dir::Dir_cursor c;
+	Dir_cursor c;
 	bool ret = try_get_cursor(filename, c);
 	cur = c;
 
@@ -191,7 +170,7 @@ void List_dir::set_path(const path& dir)
 	if (dir.empty())
 	{
 		m_path.clear();
-		m_dir_items.clear();
+		m_dir_ptr->clear();
 		m_path_hash = 0;
 
 		return;
@@ -208,7 +187,7 @@ void List_dir::set_path(const path& dir)
 	Column::set_path(dir);
 	m_path_hash = hash_value(dir);
 
-	read_directory();
+	update_dir_cache(dir);
 	m_implicit_cursor = acquire_cursor();
 }
 
