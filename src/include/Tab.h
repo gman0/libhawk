@@ -107,6 +107,9 @@ namespace hawk {
 		void update_paths(boost::filesystem::path path);
 		void update_active_cursor();
 		void activate_last_column();
+		// Used when calling set_cursor(). Returns true if
+		// the cursor can be safely set.
+		bool prepare_cursor();
 
 		void add_column(const Type_factory::Handler& closure);
 		// Sets column's path and calls its ready().

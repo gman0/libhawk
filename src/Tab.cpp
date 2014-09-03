@@ -131,13 +131,7 @@ List_dir* const Tab::get_active_list_dir() const
 
 void Tab::set_cursor(List_dir::Dir_cursor cursor)
 {
-	// Remove the preview column if there's one.
-	remove_preview();
-
-	// Reset the active column.
-	activate_last_column();
-
-	if (!m_active_ld->get_contents().empty())
+	if (prepare_cursor())
 	{
 		// Set the cursor in the active column.
 		m_active_ld->set_cursor(cursor);
@@ -148,13 +142,7 @@ void Tab::set_cursor(List_dir::Dir_cursor cursor)
 
 void Tab::set_cursor(const path& p)
 {
-	// Remove the preview column if there's one.
-	remove_preview();
-
-	// Reset the active column.
-	activate_last_column();
-
-	if (!m_active_ld->get_contents().empty())
+	if (prepare_cursor())
 	{
 		// Set the cursor in the active column.
 		m_active_ld->set_cursor(p);
@@ -231,6 +219,16 @@ void Tab::update_active_cursor()
 void Tab::activate_last_column()
 {
 	m_active_ld = static_cast<List_dir*>(m_columns.back().get());
+}
+
+bool Tab::prepare_cursor()
+{
+	// Remove the preview column if there's one.
+	remove_preview();
+	// Reset the active column.
+	activate_last_column();
+
+	return !m_active_ld->get_contents().empty();
 }
 
 void Tab::add_preview(const path& p)
