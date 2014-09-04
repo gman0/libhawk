@@ -1,7 +1,25 @@
+/*
+	Copyright (C) 2013-2014 Róbert "gman" Vašek <gman@codefreax.org>
+
+	This file is part of libhawk.
+
+	libhawk is free software: you can redistribute it and/or modify
+	it under the terms of the GNU General Public License as published by
+	the Free Software Foundation, either version 2 of the License, or
+	(at your option) any later version.
+
+	libhawk is distributed in the hope that it will be useful,
+	but WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+	GNU General Public License for more details.
+
+	You should have received a copy of the GNU General Public License
+	along with libhawk.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 #ifndef HAWK_DIR_CACHE_H
 #define HAWK_DIR_CACHE_H
 
-#include <unordered_map>
 #include <memory>
 #include <boost/filesystem/path.hpp>
 #include "No_hash.h"
@@ -22,26 +40,17 @@ namespace hawk
 	class Dir_ptr
 	{
 	private:
-		using Map = std::unordered_map<size_t,
-						std::shared_ptr<Dir_vector>, No_hash>;
 		using Ptr = std::shared_ptr<Dir_vector>;
-
 		Ptr m_ptr;
-		Map* m_source;
-		size_t m_hash;
 
 	public:
-		Dir_ptr() : m_source{nullptr} {}
-		Dir_ptr(Ptr& ptr, Map* src, size_t path_hash)
-			:
-			  m_ptr{ptr},
-			  m_source{src},
-			  m_hash{path_hash}
-		{}
+		Dir_ptr() {}
+		Dir_ptr(Ptr& ptr);
 
 		~Dir_ptr();
 
-		Dir_ptr(Dir_ptr&& ptr) noexcept;
+		Dir_ptr(Dir_ptr&& ptr) noexcept
+			: m_ptr{std::move(ptr.m_ptr)} {}
 		Dir_ptr& operator=(Dir_ptr&& ptr) noexcept;
 
 		Dir_vector* get() const { return m_ptr.get(); }
