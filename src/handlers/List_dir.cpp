@@ -86,12 +86,7 @@ List_dir& List_dir::operator=(List_dir&& ld) noexcept
 
 void List_dir::update_dir_cache(const path& p)
 {
-	m_dir_ptr = get_dir_ptr(p, m_path_hash);
-
-	// Free up some space if we need to.
-	constexpr int cache_max_size = 1024;
-	if (m_dir_ptr->size() > cache_max_size)
-		m_dir_ptr->resize(cache_max_size);
+//	m_dir_ptr = get_dir_ptr(p, m_path_hash);
 }
 
 bool List_dir::acquire_cursor()
@@ -170,7 +165,7 @@ void List_dir::set_path(const path& dir)
 	if (dir.empty())
 	{
 		m_path.clear();
-		m_dir_ptr->clear();
+		m_dir_ptr.reset();
 		m_path_hash = 0;
 
 		return;
@@ -185,9 +180,10 @@ void List_dir::set_path(const path& dir)
 		throw filesystem_error {dir.native(), make_error_code(permission_denied)};
 
 	Column::set_path(dir);
-	m_path_hash = hash_value(dir);
 
-	update_dir_cache(dir);
+	m_path_hash = hash_value(dir);
+//	m_dir_ptr = get_dir_ptr(dir, m_path_hash);
+	m_dir_ptr = get_dir_ptr(dir, m_path_hash);
 	m_implicit_cursor = acquire_cursor();
 }
 

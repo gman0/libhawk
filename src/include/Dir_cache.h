@@ -22,7 +22,6 @@
 
 #include <memory>
 #include <boost/filesystem/path.hpp>
-#include "No_hash.h"
 
 namespace hawk
 {
@@ -36,29 +35,13 @@ namespace hawk
 	using Dir_vector = std::vector<Dir_entry>;
 	using Dir_cursor = Dir_vector::iterator;
 	using Dir_const_cursor = Dir_vector::const_iterator;
+	using Dir_ptr = std::shared_ptr<Dir_vector>;
 
-	class Dir_ptr
-	{
-	private:
-		using Ptr = std::shared_ptr<Dir_vector>;
-		Ptr m_ptr;
+	Dir_ptr get_dir_ptr(const boost::filesystem::path& p,
+						size_t path_hash);
 
-	public:
-		Dir_ptr() {}
-		Dir_ptr(Ptr& ptr);
-
-		~Dir_ptr();
-
-		Dir_ptr(Dir_ptr&& ptr) noexcept
-			: m_ptr{std::move(ptr.m_ptr)} {}
-		Dir_ptr& operator=(Dir_ptr&& ptr) noexcept;
-
-		Dir_vector* get() const { return m_ptr.get(); }
-		Dir_vector* operator->() const { return m_ptr.get(); }
-		Dir_vector& operator*() const { return *m_ptr; }
-	};
-
-	Dir_ptr get_dir_ptr(const boost::filesystem::path& p, size_t path_hash);
+	// Destroy free_ptrs free pointers.
+	void destroy_free_dir_ptrs(int free_ptrs);
 }
 
 #endif // HAWK_DIR_CACHE_H

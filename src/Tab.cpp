@@ -24,6 +24,7 @@
 #include "Tab.h"
 #include "Cursor_cache.h"
 #include "Column.h"
+#include "Dir_cache.h"
 
 using namespace boost::filesystem;
 
@@ -40,6 +41,18 @@ static void dissect_path(path& p, int ncols, std::vector<path>& out)
 		out[ncols] = p;
 		p = p.parent_path();
 	}
+}
+
+static int get_empty_columns(const Tab::Column_vector& col_vec)
+{
+	int n = 0;
+	for (auto& col : col_vec)
+	{
+		if (col->get_path().empty())
+			++n;
+	}
+
+	return n;
 }
 
 Tab::Tab(const path& p, Cursor_cache* cc, int ncols,
@@ -110,6 +123,7 @@ void Tab::set_path(path p)
 	}
 
 	update_active_cursor();
+	destroy_free_dir_ptrs(get_empty_columns(m_columns));
 	m_path = std::move(p);
 
 	if (err.fail_level)

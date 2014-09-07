@@ -17,8 +17,8 @@
 	along with libhawk.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <unordered_map>
 #include <utility>
+#include <list>
 #include <boost/filesystem.hpp>
 #include "Dir_cache.h"
 
@@ -26,51 +26,68 @@ using namespace boost::filesystem;
 
 namespace hawk {
 
-using Map = std::unordered_map<size_t,
-				std::shared_ptr<Dir_vector>, No_hash>;
-using Ptr = std::shared_ptr<Dir_vector>;
-
-static Map s_src;
-static unsigned s_ptrs_in_use = 0;
-
-static int get_free_ptrs()
-{ return s_src.size() - s_ptrs_in_use; }
-
-static bool is_free(Map::iterator it)
-{ return (it->second.use_count() < 3); }
-
-Dir_ptr::Dir_ptr(Ptr& ptr) : m_ptr{ptr}
+struct Cache_entry
 {
-	++s_ptrs_in_use;
+	size_t	hash;
+	Dir_ptr	ptr;
+};
+
+using List = std::list<Cache_entry>;
+using List_iter = List::iterator;
+static List s_entries;
+static int s_nfree = 0;
+
+static bool find_entry(List& l, List_iter& it, size_t path_hash)
+{
+	it = std::find_if(l.begin(), l.end(),
+					  [path_hash](const Cache_entry& entry)
+					  { return entry.hash == path_hash; });
+
+	return it != l.end();
 }
 
-Dir_ptr::~Dir_ptr()
+static bool is_free(List_iter& it)
 {
-	if (!m_ptr)
-		return;
+	return it->hash == 0;
+}
 
-	--s_ptrs_in_use;
+// Don't waste space.
+static void shrink(Dir_ptr& ptr)
+{
+	constexpr unsigned max_size = 1024;
+	ptr->resize(max_size);
+}
 
-	int free_ptrs = get_free_ptrs();
-	if (free_ptrs > 0)
+static void cmp_and_set(List_iter& out, List_iter& other)
+{
+	if (s_nfree == 1)
+		out = other;
+	else
 	{
-		for (auto it = s_src.begin(); it != s_src.end(); ++it)
-		{
-			if (is_free(it))
-			{
-				s_src.erase(it);
-				--free_ptrs;
-			}
-		}
+		// Try to get a larger vector.
+		if (other->ptr->size() > out->ptr->size())
+			out = other;
 	}
 }
 
-Dir_ptr& Dir_ptr::operator=(Dir_ptr&& ptr) noexcept
+static bool prepare_and_find_free_ptrs(List& l, List_iter& out)
 {
-	m_ptr = std::move(ptr.m_ptr);
-	return *this;
-}
+	s_nfree = 0;
 
+	for (auto it = l.begin(); it != l.end(); ++it)
+	{
+		if (it->ptr.use_count() == 1)
+		{
+			++s_nfree;
+			it->hash = 0;
+
+			shrink(it->ptr);
+			cmp_and_set(out, it);
+		}
+	}
+
+	return s_nfree;
+}
 
 // Gather contents of a directory and move them to the out vector
 static void gather_dir_contents(const path& p, Dir_vector& out)
@@ -90,38 +107,51 @@ static void gather_dir_contents(const path& p, Dir_vector& out)
 	}
 }
 
-static Dir_ptr make_dir_ptr(const path& p, size_t path_hash)
-{
-	Ptr vec_ptr = std::make_shared<Dir_vector>();
-	gather_dir_contents(p, *vec_ptr);
-	s_src[path_hash] = vec_ptr;
-
-	return Dir_ptr(vec_ptr);
-}
-
 Dir_ptr get_dir_ptr(const path& p, size_t path_hash)
 {
-	auto it = s_src.find(path_hash);
-
-	if (it == s_src.end())
+	List_iter find;
+	if (find_entry(s_entries, find, path_hash))
+		return find->ptr;
+	else
 	{
-		if (get_free_ptrs() > 0)
+		List_iter find_free;
+		if (prepare_and_find_free_ptrs(s_entries, find_free))
 		{
-			for (auto it = s_src.begin(); it != s_src.end(); ++it)
-			{
-				if (!is_free(it)) continue;
+			find_free->hash = path_hash;
+			find_free->ptr->clear();
+			gather_dir_contents(p, *find_free->ptr);
 
-				Ptr vec_ptr = it->second;
-				vec_ptr->clear();
-
-				return Dir_ptr(vec_ptr);
-			}
+			return find_free->ptr;
 		}
 	}
-	else
-		return Dir_ptr(it->second);
 
-	return make_dir_ptr(p, path_hash);
+	Cache_entry ent {path_hash, std::make_shared<Dir_vector>()};
+	gather_dir_contents(p, *ent.ptr);
+	s_entries.push_back(ent);
+
+	return ent.ptr;
+}
+
+void destroy_free_dir_ptrs(int free_ptrs)
+{
+	if (--free_ptrs > 0)
+	{
+		List_iter it = s_entries.begin();
+		List_iter next;
+		while (it != s_entries.end() && free_ptrs >= 0)
+		{
+			next = it;
+			++next;
+
+			if (is_free(it))
+			{
+				s_entries.erase(it);
+				--free_ptrs;
+			}
+
+			it = next;
+		}
+	}
 }
 
 } // namespace hawk
