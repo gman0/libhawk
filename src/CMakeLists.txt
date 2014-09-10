@@ -15,7 +15,7 @@ add_library(hawk_obj OBJECT ${srcs})
 add_library(hawk_static STATIC $<TARGET_OBJECTS:hawk_obj>)
 add_library(hawk SHARED $<TARGET_OBJECTS:hawk_obj>)
 
-target_link_libraries(hawk ${Boost_LIBRARIES} magic)
+target_link_libraries(hawk ${Boost_LIBRARIES} magic pthread)
 
 install(TARGETS hawk hawk_static DESTINATION lib)
 install(DIRECTORY "include/" DESTINATION "include/hawk")
