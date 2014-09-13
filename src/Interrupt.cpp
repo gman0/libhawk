@@ -29,6 +29,11 @@ void Interrupt_flag::set()
 	m_flag.store(true, std::memory_order_relaxed);
 }
 
+void Interrupt_flag::clear()
+{
+	m_flag.store(false, std::memory_order_relaxed);
+}
+
 bool Interrupt_flag::is_set() const
 {
 	return m_flag.load(std::memory_order_relaxed);
@@ -37,13 +42,19 @@ bool Interrupt_flag::is_set() const
 void soft_interruption_point()
 {
 	if (_soft_iflag.is_set())
+	{
+		_soft_iflag.clear();
 		throw Soft_thread_interrupt();
+	}
 }
 
 void hard_interruption_point()
 {
 	if (_hard_iflag.is_set())
+	{
+		_hard_iflag.clear();
 		throw Hard_thread_interrupt();
+	}
 }
 
 } // namespace hawk

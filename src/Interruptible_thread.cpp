@@ -31,13 +31,20 @@ Interruptible_thread::~Interruptible_thread()
 void Interruptible_thread::join()
 {
 	m_thread.join();
-	m_flag = nullptr;
+	m_hard_iflag = nullptr;
+	m_soft_iflag = nullptr;
 }
 
-void Interruptible_thread::interrupt()
+void Interruptible_thread::hard_interrupt()
 {
-	if (m_flag)
-		m_flag->set();
+	if (m_hard_iflag)
+		m_hard_iflag->set();
+}
+
+void Interruptible_thread::soft_interrupt()
+{
+	if (m_soft_iflag)
+		m_soft_iflag->set();
 }
 
 } // namespace hawk

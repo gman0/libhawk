@@ -29,16 +29,19 @@ namespace hawk {
 	{
 	private:
 		std::thread m_thread;
-		Interrupt_flag* m_flag;
+		Interrupt_flag* m_hard_iflag;
+		Interrupt_flag* m_soft_iflag;
 
 	public:
 		template <typename Function, typename... Args>
 		explicit Interruptible_thread(Function&& f, Args&&... args)
 		{
-			std::promise<Interrupt_flag*> p;
+			std::promise<Interrupt_flag*> hard;
+			std::promise<Interrupt_flag*> soft;
 
 			m_thread = std::thread([&, f]{
-				p.set_value(&_hard_iflag);
+				hard.set_value(&_hard_iflag);
+				soft.set_value(&_soft_iflag);
 
 				try {
 					f(std::forward<Args>(args)...);
@@ -46,7 +49,8 @@ namespace hawk {
 				{}
 			});
 
-			m_flag = p.get_future().get();
+			m_hard_iflag = hard.get_future().get();
+			m_soft_iflag = soft.get_future().get();
 		}
 
 		~Interruptible_thread();
@@ -59,7 +63,9 @@ namespace hawk {
 
 		void join();
 		bool joinable();
-		void interrupt();
+
+		void hard_interrupt();
+		void soft_interrupt();
 	};
 }
 

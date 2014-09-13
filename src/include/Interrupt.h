@@ -30,6 +30,7 @@ namespace hawk {
 
 	public:
 		void set();
+		void clear();
 		bool is_set() const;
 	};
 
