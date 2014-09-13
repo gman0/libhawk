@@ -31,8 +31,8 @@ namespace hawk {
 	protected:
 		boost::filesystem::path m_path;
 
-		// Columns form a linked-list-like structure. This pointer is used
-		// to set cursors properly.
+		// Columns form a linked-list-like structure. This pointer
+		// is used to set cursors properly.
 		const Column* m_next_column;
 
 	public:
@@ -51,11 +51,10 @@ namespace hawk {
 		const boost::filesystem::path& get_path() const;
 		virtual void set_path(const boost::filesystem::path& path);
 
-		// (internally called by hawk::Tab, this method
-		// should not be called from user code)
-		// This method is called after the Column has been
-		// successfully created, the path has been set and
-		// is ready to use.
+		// This method is called internally by hawk::Tab when the
+		// path has been successfuly set and the Column is ready to
+		// use. Note that in List_dir this method can be called
+		// arbitrary number of times.
 		virtual void ready() = 0;
 
 	protected:
