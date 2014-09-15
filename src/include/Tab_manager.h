@@ -21,6 +21,7 @@
 #define HAWK_TAB_MANAGER_H
 
 #include <list>
+#include <vector>
 #include "Tab.h"
 
 namespace hawk {
@@ -44,12 +45,17 @@ namespace hawk {
 		Tab_manager(Type_factory* tf, unsigned ncols);
 		Tab_manager(const Tab_manager&) = delete;
 		Tab_manager& operator=(const Tab_manager&) = delete;
+		Tab_manager(Tab_manager&&) = delete;
+		Tab_manager& operator=(Tab_manager&&) = delete;
 
 		// These can return nullptr if the tab construction fails.
 		Tab* add_tab(const boost::filesystem::path& pwd, Cursor_cache* cc);
 		Tab* add_tab(boost::filesystem::path&& pwd, Cursor_cache* cc);
 
 		Tab_list& get_tabs();
+
+	private:
+		void on_fs_change(const std::vector<size_t>& paths);
 	};
 }
 
