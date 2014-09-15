@@ -92,6 +92,9 @@ namespace hawk {
 
 		const boost::filesystem::path& get_path() const;
 		void set_path(boost::filesystem::path path);
+		// Reloads Tab with current path. It's nearly the same
+		// as calling set_path(get_path()) but it's thread safe.
+		void reload_current_path();
 
 		const Column_vector& get_columns() const;
 		List_dir* const get_active_list_dir() const;

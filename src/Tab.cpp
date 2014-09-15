@@ -18,9 +18,14 @@
 */
 
 #include <boost/filesystem.hpp>
+#include <boost/functional/hash.hpp>
 #include <algorithm>
 #include <utility>
 #include <exception>
+#include <mutex>
+#include <thread>
+#include <chrono>
+#include <atomic>
 #include "Tab.h"
 #include "Cursor_cache.h"
 #include "Column.h"
@@ -29,6 +34,10 @@
 using namespace boost::filesystem;
 
 namespace hawk {
+
+static std::mutex s_mutex;
+static std::mutex s_path_mutex;
+static std::mutex s_cursor_mutex;
 
 static void dissect_path(path& p, int ncols, std::vector<path>& out)
 {
@@ -53,6 +62,31 @@ static int get_empty_columns(const Tab::Column_vector& col_vec)
 	}
 
 	return n;
+}
+
+static bool dir_readable(const path& p)
+{
+	boost::system::error_code ec;
+	if (!is_directory(p, ec)) return false;
+
+	directory_iterator it {p, ec};
+	return !ec;
+}
+
+// Checks path for validity
+static void check_and_rollback_path(path& p, const path& old_p)
+{
+	if (dir_readable(p)) return; // We're good to go.
+
+	p = old_p; // Roll back to the previous path.
+	if (dir_readable(p)) return;
+
+	// Otherwise roll back to the parent directory until it's readable.
+	while (!dir_readable(p))
+		p = p.parent_path();
+
+	if (p.empty())
+		p = "/";
 }
 
 Tab::Tab(const path& p, Cursor_cache* cc, int ncols,
@@ -88,49 +122,48 @@ const path& Tab::get_path() const
 
 void Tab::set_path(path p)
 {
-	static struct
-	{
-		path prev_path;
-		char fail_level = 0;
-		std::exception_ptr eptr;
-	} err;
+	std::exception_ptr eptr;
+	try { p = canonical(p, m_path); }
+	catch (...) { eptr = std::current_exception(); }
 
-	try
-	{
-		p = canonical(p, m_path);
-		if (p.empty())
-			p = "/";
+	if (p.empty())
+		p = "/";
 
+	{
+		std::lock_guard<std::mutex> lk {s_mutex};
+		check_and_rollback_path(p, m_path);
 		update_paths(p);
+		update_active_cursor();
+		destroy_free_dir_ptrs(get_empty_columns(m_columns));
+
+		std::lock_guard<std::mutex> lk_path {s_path_mutex};
+		m_path = std::move(p);
 	}
-	catch (...)
+
+	if (eptr)
+		std::rethrow_exception(eptr);
+}
+
+void Tab::reload_current_path()
+{
+	path p;
+
 	{
-		if (err.fail_level == 0)
+		std::unique_lock<std::mutex> lk {s_path_mutex, std::defer_lock};
+		for (;;)
 		{
-			++err.fail_level;
-			err.prev_path = std::move(m_path);
-			err.eptr = std::current_exception();
-
-			set_path(err.prev_path);
-		}
-		else
-		{
-			err.fail_level = 2;
-			err.prev_path = err.prev_path.parent_path();
-
-			set_path(err.prev_path);
+			lk.lock();
+			p = m_path;
+			lk.unlock();
+			std::this_thread::sleep_for(std::chrono::milliseconds{1});
+			lk.lock();
+			if (p == m_path) break;
+			lk.unlock();
+			std::this_thread::sleep_for(std::chrono::milliseconds{1});
 		}
 	}
 
-	update_active_cursor();
-	destroy_free_dir_ptrs(get_empty_columns(m_columns));
-	m_path = std::move(p);
-
-	if (err.fail_level)
-	{
-		err.fail_level = 0;
-		std::rethrow_exception(err.eptr);
-	}
+	set_path(p);
 }
 
 const Tab::Column_vector& Tab::get_columns() const
@@ -145,6 +178,7 @@ List_dir* const Tab::get_active_list_dir() const
 
 void Tab::set_cursor(Dir_cursor cursor)
 {
+	std::lock_guard<std::mutex> lk {s_cursor_mutex};
 	if (prepare_cursor())
 	{
 		// Set the cursor in the active column.
@@ -156,6 +190,7 @@ void Tab::set_cursor(Dir_cursor cursor)
 
 void Tab::set_cursor(const path& p)
 {
+	std::lock_guard<std::mutex> lk {s_cursor_mutex};
 	if (prepare_cursor())
 	{
 		// Set the cursor in the active column.
@@ -186,7 +221,7 @@ void Tab::instantiate_columns(int ncols)
 
 void Tab::initialize_columns(int ncols)
 {
-	static std::vector<path> path_vec;
+	std::vector<path> path_vec;
 	path_vec.clear();
 
 	path p = m_path;
@@ -206,11 +241,11 @@ void Tab::update_paths(path p)
 	else
 		--ncols;
 
-	m_columns[ncols]->set_path(p);
+	ready_column(m_columns[ncols], p);
 	for (int i = ncols - 1; i >= 0; i--)
 	{
 		p = p.parent_path();
-		m_columns[i]->set_path(p);
+		ready_column(m_columns[i], p);
 	}
 }
 
