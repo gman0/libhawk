@@ -18,8 +18,13 @@
 */
 
 #include <utility>
-#include <list>
+#include <functional>
+#include <memory>
 #include <boost/filesystem.hpp>
+#include <thread>
+#include <chrono>
+#include <atomic>
+#include <mutex>
 #include "Dir_cache.h"
 
 using namespace boost::filesystem;
@@ -28,28 +33,13 @@ namespace hawk {
 
 struct Cache_entry
 {
-	size_t	hash;
-	Dir_ptr	ptr;
+	size_t hash;
+	time_t timestamp;
+	boost::filesystem::path path;
+	Dir_ptr ptr;
 };
 
-using List = std::list<Cache_entry>;
-using List_iter = List::iterator;
-static List s_entries;
-static int s_nfree = 0;
-
-static bool find_entry(List& l, List_iter& it, size_t path_hash)
-{
-	it = std::find_if(l.begin(), l.end(),
-					  [path_hash](const Cache_entry& entry)
-					  { return entry.hash == path_hash; });
-
-	return it != l.end();
-}
-
-static bool is_free(List_iter& it)
-{
-	return it->hash == 0;
-}
+static bool is_free(const Cache_entry& ent) { return ent.hash == 0; }
 
 // Don't waste space.
 static void shrink(Dir_ptr& ptr)
@@ -58,36 +48,194 @@ static void shrink(Dir_ptr& ptr)
 	ptr->resize(max_size);
 }
 
-static void cmp_and_set(List_iter& out, List_iter& other)
+static class Cache_list
 {
-	if (s_nfree == 1)
-		out = other;
-	else
-	{
-		// Try to get a larger vector.
-		if (other->ptr->size() > out->ptr->size())
-			out = other;
-	}
-}
+public:
+	using Fn = std::function<void(Cache_entry& ent)>;
 
-static bool prepare_and_find_free_ptrs(List& l, List_iter& out)
-{
-	s_nfree = 0;
-
-	for (auto it = l.begin(); it != l.end(); ++it)
+private:
+	struct Node
 	{
-		if (it->ptr.use_count() == 1)
+		std::atomic<bool> in_use;
+		Node* next;
+		Cache_entry ent;
+	};
+
+	std::atomic<Node*> m_head;
+	std::mutex m_mutex;
+
+public:
+	Cache_list() : m_head{nullptr} {}
+	~Cache_list()
+	{
+		Node* n = m_head.load();
+		while (n)
 		{
-			++s_nfree;
-			it->hash = 0;
+			Node* tmp = n;
+			n = n->next;
 
-			shrink(it->ptr);
-			cmp_and_set(out, it);
+			delete tmp;
 		}
 	}
 
-	return s_nfree;
-}
+	void push_front(const Cache_entry& ent)
+	{
+		Node* n = new Node {{false}, nullptr, ent};
+		n->next = m_head.load();
+
+		// This is ok to do since we've got only single writer thread.
+		m_head.store(n);
+	}
+
+	bool find(size_t path_hash, Cache_entry& out)
+	{
+		Node* n = m_head.load();
+		while (n)
+		{
+			if (n->ent.hash == path_hash)
+			{
+				out = n->ent;
+				return true;
+			}
+
+			n = n->next;
+		}
+
+		return false;
+	}
+
+	void for_each(Fn f)
+	{
+		std::lock_guard<std::mutex> lk {m_mutex};
+
+		Node* n = m_head.load();
+		while(n)
+		{
+			bool in_use = false;
+			if (n->in_use.compare_exchange_strong(in_use, true,
+								std::memory_order_release,
+								std::memory_order_relaxed) && !in_use)
+			{
+				f(n->ent);
+				n->in_use.store(false, std::memory_order_release);
+			}
+
+			n = n->next;
+		}
+	}
+
+	bool try_allocate_free_ptr(Fn f)
+	{
+		Node* free = find_largest_vector();
+		if (free)
+		{
+			spinlock_in_use(free);
+
+			f(free->ent);
+
+			free->in_use.store(false, std::memory_order_release);
+		}
+
+		return free;
+	}
+
+	void free_ptrs()
+	{
+		Node* n = m_head.load();
+		while (n)
+		{
+			if (n->ent.ptr.use_count() == 1)
+			{
+				spinlock_in_use(n);
+
+				n->ent.hash = 0;
+				n->ent.timestamp = 0;
+
+				shrink(n->ent.ptr);
+				n->ent.ptr->clear();
+
+				n->in_use.store(false, std::memory_order_release);
+			}
+
+			n = n->next;
+		}
+	}
+
+	void delete_free_ptrs(int nptrs)
+	{
+		if (--nptrs > 0)
+		{
+			std::lock_guard<std::mutex> lk {m_mutex};
+
+			Node* prev = nullptr;
+			Node* n = m_head.load();
+			while (n && nptrs >= 0)
+			{
+				Node* next = n->next;
+
+				if (is_free(n->ent))
+				{
+					delete n;
+
+					if (prev)
+						prev->next = next;
+				}
+				else
+					prev = n;
+
+				n = next;
+			}
+		}
+	}
+
+private:
+	Node* find_largest_vector()
+	{
+		Node* free = nullptr;
+		Node* n = m_head.load();
+		while(n)
+		{
+			if (is_free(n->ent))
+			{
+				if (!free)
+					free = n;
+				else
+				{
+					if (n->ent.ptr->capacity() > free->ent.ptr->capacity())
+						free = n;
+				}
+			}
+
+			n = n->next;
+		}
+
+		return free;
+	}
+
+	inline void spinlock_in_use(Node* n)
+	{
+		// Wait for the node to be released and mark it as
+		// in-use rigt away.
+		bool in_use = false;
+		while (!n->in_use.compare_exchange_weak(in_use, true,
+						std::memory_order_acquire,
+						std::memory_order_relaxed) && in_use);
+	}
+} s_entries;
+
+static struct Filesystem_watchdog
+{
+	std::unique_ptr<std::thread> thread;
+	std::atomic<bool> done;
+	On_fs_change_f on_change;
+
+	Filesystem_watchdog() : done{false} {}
+	~Filesystem_watchdog()
+	{
+		done.store(true);
+		thread->join();
+	}
+} s_fs_watchdog;
 
 // Gather contents of a directory and move them to the out vector
 static void gather_dir_contents(const path& p, Dir_vector& out)
@@ -107,51 +255,106 @@ static void gather_dir_contents(const path& p, Dir_vector& out)
 	}
 }
 
-Dir_ptr get_dir_ptr(const path& p, size_t path_hash)
+static void try_update_dir_contents(Cache_entry& ent,
+									std::vector<size_t>& hash_vec)
 {
-	List_iter find;
-	if (find_entry(s_entries, find, path_hash))
-		return find->ptr;
-	else
+	if (!exists(ent.path))
 	{
-		List_iter find_free;
-		if (prepare_and_find_free_ptrs(s_entries, find_free))
-		{
-			find_free->hash = path_hash;
-			find_free->ptr->clear();
-			gather_dir_contents(p, *find_free->ptr);
-
-			return find_free->ptr;
-		}
+		hash_vec.push_back(ent.hash);
+		return;
 	}
 
-	Cache_entry ent {path_hash, std::make_shared<Dir_vector>()};
+	time_t new_timestamp = last_write_time(ent.path);
+
+	if (new_timestamp > ent.timestamp)
+	{
+		ent.ptr->clear();
+		ent.timestamp = new_timestamp;
+
+		try { gather_dir_contents(ent.path, *(ent.ptr)); }
+		catch (const filesystem_error&) {}
+		// Ignore any exceptions as we're going to
+		// reload_current_path later anyway.
+
+		hash_vec.push_back(ent.hash);
+	}
+}
+
+static void fs_watchdog()
+{
+	static std::vector<size_t> hash_vec;
+
+	while (!s_fs_watchdog.done)
+	{
+		s_entries.for_each(
+					[](Cache_entry& ent) {
+			if (is_free(ent)) return;
+			try_update_dir_contents(ent, hash_vec);
+		});
+
+		if (!hash_vec.empty())
+		{
+			try { s_fs_watchdog.on_change(hash_vec); }
+			catch (...) {} // We can't deal with any exceptions at this point.
+
+			hash_vec.clear();
+		}
+
+		if (!s_fs_watchdog.done.load())
+			std::this_thread::sleep_for(std::chrono::seconds{1});
+		else
+			break;
+	}
+}
+
+void start_filesystem_watchdog(On_fs_change_f&& on_fs_change)
+{
+	s_fs_watchdog.on_change = std::move(on_fs_change);
+	s_fs_watchdog.thread.reset(new std::thread{&fs_watchdog});
+}
+
+static void build_cache_entry(Cache_entry& ent, const path& p,
+							  size_t path_hash)
+{
+	ent.hash = path_hash;
+	ent.timestamp = last_write_time(p);
+	ent.path = p;
+	ent.ptr = std::make_shared<Dir_vector>();
 	gather_dir_contents(p, *ent.ptr);
-	s_entries.push_back(ent);
+}
+
+Dir_ptr get_dir_ptr(const path& p, size_t path_hash)
+{
+	Cache_entry ent;
+
+	if (s_entries.find(path_hash, ent))
+		return ent.ptr;
+	else
+	{
+		s_entries.free_ptrs();
+
+		Cache_list::Fn update_entry = [&](Cache_entry& e) {
+			e.hash = path_hash;
+			e.timestamp = last_write_time(p);
+			e.path = p;
+			gather_dir_contents(p, *(e.ptr));
+
+			ent = e;
+		};
+
+		if (s_entries.try_allocate_free_ptr(update_entry))
+			return ent.ptr;
+	}
+
+	build_cache_entry(ent, p, path_hash);
+	s_entries.push_front(ent);
 
 	return ent.ptr;
 }
 
 void destroy_free_dir_ptrs(int free_ptrs)
 {
-	if (--free_ptrs > 0)
-	{
-		List_iter it = s_entries.begin();
-		List_iter next;
-		while (it != s_entries.end() && free_ptrs >= 0)
-		{
-			next = it;
-			++next;
-
-			if (is_free(it))
-			{
-				s_entries.erase(it);
-				--free_ptrs;
-			}
-
-			it = next;
-		}
-	}
+	s_entries.delete_free_ptrs(free_ptrs);
 }
 
 } // namespace hawk

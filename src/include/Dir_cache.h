@@ -21,6 +21,7 @@
 #define HAWK_DIR_CACHE_H
 
 #include <memory>
+#include <functional>
 #include <boost/filesystem/path.hpp>
 
 namespace hawk
@@ -36,6 +37,12 @@ namespace hawk
 	using Dir_cursor = Dir_vector::iterator;
 	using Dir_const_cursor = Dir_vector::const_iterator;
 	using Dir_ptr = std::shared_ptr<Dir_vector>;
+
+	// Starts a thread that checks filesystem every second and
+	// updates cache entries if needed.
+	using On_fs_change_f =
+		std::function<void(const std::vector<size_t>&)>;
+	void start_filesystem_watchdog(On_fs_change_f&& on_fs_change);
 
 	Dir_ptr get_dir_ptr(const boost::filesystem::path& p,
 						size_t path_hash);
