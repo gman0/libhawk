@@ -92,8 +92,6 @@ namespace hawk {
 		bool implicit_cursor() const { return m_implicit_cursor; }
 
 	private:
-		void update_dir_cache(const boost::filesystem::path& path);
-
 		// Returns true if the cursor was acquired implicity,
 		// otherwise false.
 		bool acquire_cursor();

@@ -84,11 +84,6 @@ List_dir& List_dir::operator=(List_dir&& ld) noexcept
 	return *this;
 }
 
-void List_dir::update_dir_cache(const path& p)
-{
-//	m_dir_ptr = get_dir_ptr(p, m_path_hash);
-}
-
 bool List_dir::acquire_cursor()
 {
 	if (m_next_column)
@@ -182,7 +177,6 @@ void List_dir::set_path(const path& dir)
 	Column::set_path(dir);
 
 	m_path_hash = hash_value(dir);
-//	m_dir_ptr = get_dir_ptr(dir, m_path_hash);
 	m_dir_ptr = get_dir_ptr(dir, m_path_hash);
 	m_implicit_cursor = acquire_cursor();
 }
