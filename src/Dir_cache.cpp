@@ -25,7 +25,9 @@
 #include <chrono>
 #include <atomic>
 #include <mutex>
+#include <shared_mutex>
 #include "Dir_cache.h"
+#include "Interrupt.h"
 
 using namespace boost::filesystem;
 
@@ -51,18 +53,25 @@ static void shrink(Dir_ptr& ptr)
 static class Cache_list
 {
 public:
-	using Fn = std::function<void(Cache_entry& ent)>;
+	using Fn = std::function<void(Cache_entry&)>;
 
 private:
+	enum class Node_state : char
+	{
+		not_in_use,
+		in_use_block,
+		in_use_skip
+	};
+
 	struct Node
 	{
-		std::atomic<bool> in_use;
+		std::atomic<Node_state> state;
 		Node* next;
 		Cache_entry ent;
 	};
 
 	std::atomic<Node*> m_head;
-	std::mutex m_mutex;
+	std::shared_timed_mutex m_smutex;
 
 public:
 	Cache_list() : m_head{nullptr} {}
@@ -80,22 +89,39 @@ public:
 
 	void push_front(const Cache_entry& ent)
 	{
-		Node* n = new Node {{false}, nullptr, ent};
+		std::shared_lock<std::shared_timed_mutex> lk {m_smutex};
+
+		Node* n = new Node {{Node_state::not_in_use}, nullptr, ent};
 		n->next = m_head.load();
 
-		// This is ok to do since we've got only single writer thread.
-		m_head.store(n);
+		while (!m_head.compare_exchange_weak(n->next, n));
 	}
 
 	bool find(size_t path_hash, Cache_entry& out)
 	{
+		std::shared_lock<std::shared_timed_mutex> lk {m_smutex};
+
 		Node* n = m_head.load();
 		while (n)
 		{
-			if (n->ent.hash == path_hash)
+			if (n->ent.hash == path_hash
+				&& n->state.load() != Node_state::in_use_skip)
 			{
-				out = n->ent;
-				return true;
+				if (wait_for_state(n->state, Node_state::in_use_block,
+								   Node_state::in_use_skip))
+				{
+					// 2nd check because some other thread could have
+					// modified this before setting the state to in_use_block.
+					if (n->ent.hash == path_hash)
+					{
+						out = n->ent;
+						n->state.store(Node_state::not_in_use);
+
+						return true;
+					}
+
+					n->state.store(Node_state::not_in_use);
+				}
 			}
 
 			n = n->next;
@@ -106,55 +132,79 @@ public:
 
 	void for_each(Fn f)
 	{
-		std::lock_guard<std::mutex> lk {m_mutex};
+		std::shared_lock<std::shared_timed_mutex> lk {m_smutex};
 
 		Node* n = m_head.load();
 		while(n)
 		{
-			bool in_use = false;
-			if (n->in_use.compare_exchange_strong(in_use, true,
-								std::memory_order_release,
-								std::memory_order_relaxed) && !in_use)
+			if (n->state.load() != Node_state::in_use_skip)
 			{
-				f(n->ent);
-				n->in_use.store(false, std::memory_order_release);
+				if (wait_for_state(n->state, Node_state::in_use_block,
+								   Node_state::in_use_skip))
+				{
+					f(n->ent);
+					n->state.store(Node_state::not_in_use);
+				}
 			}
 
 			n = n->next;
 		}
 	}
 
-	bool try_allocate_free_ptr(Fn f)
+	bool try_reclaim_free_ptr(Fn f)
 	{
-		Node* free = find_largest_vector();
-		if (free)
+		std::shared_lock<std::shared_timed_mutex> lk {m_smutex};
+
+		Node* free = nullptr;
+		Node* n = m_head.load();
+		while (n)
 		{
-			spinlock_in_use(free);
+			if (wait_for_state(n->state, Node_state::in_use_skip,
+							   Node_state::in_use_block))
+			{
+				if (!is_free(n->ent))
+					n->state.store(Node_state::not_in_use);
+				else
+				{
+					if (!free) free = n;
+					else
+					{
+						if (n->ent.ptr->capacity() > free->ent.ptr->capacity())
+						{
+							free->state.store(Node_state::not_in_use);
+							free = n;
+						}
+					}
+				}
 
-			f(free->ent);
-
-			free->in_use.store(false, std::memory_order_release);
+				n = n->next;
+			}
 		}
+
+		if (free)
+			f(free->ent);
 
 		return free;
 	}
 
 	void free_ptrs()
 	{
+		std::shared_lock<std::shared_timed_mutex> lk {m_smutex};
+
 		Node* n = m_head.load();
 		while (n)
 		{
-			if (n->ent.ptr.use_count() == 1)
+			Node_state st = Node_state::not_in_use;
+			if (n->state.compare_exchange_strong(st, Node_state::in_use_skip))
 			{
-				spinlock_in_use(n);
+				if (is_free(n->ent))
+				{
+					n->ent.hash = 0;
+					shrink(n->ent.ptr);
+					n->ent.ptr->clear();
+				}
 
-				n->ent.hash = 0;
-				n->ent.timestamp = 0;
-
-				shrink(n->ent.ptr);
-				n->ent.ptr->clear();
-
-				n->in_use.store(false, std::memory_order_release);
+				n->state.store(Node_state::not_in_use);
 			}
 
 			n = n->next;
@@ -165,7 +215,7 @@ public:
 	{
 		if (--nptrs > 0)
 		{
-			std::lock_guard<std::mutex> lk {m_mutex};
+			std::lock_guard<std::shared_timed_mutex> lk {m_smutex};
 
 			Node* prev = nullptr;
 			Node* n = m_head.load();
@@ -189,43 +239,28 @@ public:
 	}
 
 private:
-	Node* find_largest_vector()
+	bool wait_for_state(std::atomic<Node_state>& state, Node_state desired,
+						Node_state fail)
 	{
-		Node* free = nullptr;
-		Node* n = m_head.load();
-		while(n)
+		bool cont = true;
+		Node_state st = Node_state::not_in_use;
+		while (!state.compare_exchange_weak(st, desired)
+			   && st != Node_state::not_in_use)
 		{
-			if (is_free(n->ent))
+			if (st == fail)
 			{
-				if (!free)
-					free = n;
-				else
-				{
-					if (n->ent.ptr->capacity() > free->ent.ptr->capacity())
-						free = n;
-				}
+				cont = false;
+				break;
 			}
-
-			n = n->next;
 		}
 
-		return free;
-	}
-
-	inline void spinlock_in_use(Node* n)
-	{
-		// Wait for the node to be released and mark it as
-		// in-use rigt away.
-		bool in_use = false;
-		while (!n->in_use.compare_exchange_weak(in_use, true,
-						std::memory_order_acquire,
-						std::memory_order_relaxed) && in_use);
+		return cont;
 	}
 } s_entries;
 
 static struct Filesystem_watchdog
 {
-	std::unique_ptr<std::thread> thread;
+	std::thread thread;
 	std::atomic<bool> done;
 	On_fs_change_f on_change;
 
@@ -233,24 +268,29 @@ static struct Filesystem_watchdog
 	~Filesystem_watchdog()
 	{
 		done.store(true);
-		thread->join();
+		thread.join();
 	}
 } s_fs_watchdog;
 
 // Gather contents of a directory and move them to the out vector
 static void gather_dir_contents(const path& p, Dir_vector& out)
 {
+	soft_interruption_point();
+
 	directory_iterator dir_it_end;
 	for (auto dir_it = directory_iterator {p};
 		 dir_it != dir_it_end;
 		 ++dir_it)
 	{
+		soft_interruption_point();
 		Dir_entry dir_ent;
 		dir_ent.path = std::move(*dir_it);
 
+		soft_interruption_point();
 		boost::system::error_code ec;
 		dir_ent.status = status(dir_ent.path, ec);
 
+		soft_interruption_point();
 		out.push_back(std::move(dir_ent));
 	}
 }
@@ -301,7 +341,7 @@ static void fs_watchdog()
 		}
 
 		if (!s_fs_watchdog.done.load())
-			std::this_thread::sleep_for(std::chrono::seconds{1});
+			std::this_thread::sleep_for(std::chrono::seconds {1});
 		else
 			break;
 	}
@@ -310,7 +350,7 @@ static void fs_watchdog()
 void start_filesystem_watchdog(On_fs_change_f&& on_fs_change)
 {
 	s_fs_watchdog.on_change = std::move(on_fs_change);
-	s_fs_watchdog.thread.reset(new std::thread{&fs_watchdog});
+	s_fs_watchdog.thread = std::thread {&fs_watchdog};
 }
 
 static void build_cache_entry(Cache_entry& ent, const path& p,
@@ -327,26 +367,38 @@ Dir_ptr get_dir_ptr(const path& p, size_t path_hash)
 {
 	Cache_entry ent;
 
-	if (s_entries.find(path_hash, ent))
-		return ent.ptr;
-	else
+	try
 	{
-		s_entries.free_ptrs();
-
-		Cache_list::Fn update_entry = [&](Cache_entry& e) {
-			e.hash = path_hash;
-			e.timestamp = last_write_time(p);
-			e.path = p;
-			gather_dir_contents(p, *(e.ptr));
-
-			ent = e;
-		};
-
-		if (s_entries.try_allocate_free_ptr(update_entry))
+		if (s_entries.find(path_hash, ent))
 			return ent.ptr;
+		else
+		{
+			soft_interruption_point();
+
+			s_entries.free_ptrs();
+
+			Cache_list::Fn update_entry = [&](Cache_entry& e) {
+				e.hash = path_hash;
+				e.timestamp = last_write_time(p);
+				e.path = p;
+				gather_dir_contents(p, *(e.ptr));
+
+				ent = e;
+			};
+
+			soft_interruption_point();
+
+			if (s_entries.try_reclaim_free_ptr(update_entry))
+				return ent.ptr;
+		}
+
+		build_cache_entry(ent, p, path_hash);
+	}
+	catch (Soft_thread_interrupt)
+	{
+		return nullptr;
 	}
 
-	build_cache_entry(ent, p, path_hash);
 	s_entries.push_front(ent);
 
 	return ent.ptr;
