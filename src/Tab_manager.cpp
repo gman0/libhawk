@@ -18,14 +18,11 @@
 */
 
 #include <utility>
-#include <exception>
+#include <cassert>
 #include <boost/filesystem.hpp>
 #include <boost/functional/hash.hpp>
 #include "Tab_manager.h"
 #include "handlers/List_dir_hash.h"
-#include "Dir_cache.h"
-
-#include <cassert>
 
 using boost::filesystem::path;
 
@@ -43,19 +40,19 @@ static Tab* get_tab_ptr(Tab_iterator& prev, Tab_iterator& curr)
 		return &(*curr);
 }
 
-Tab_manager::Tab_manager(Type_factory* tf, unsigned ncols)
+Tab_manager::Tab_manager(Type_factory* tf, unsigned ncols,
+						 Populate_user_data&& populate_user_data)
 	:
 	  m_type_factory{tf},
 	  m_ncols{ncols}
 {
 	m_list_dir_closure = tf->get_handler(hash_list_dir());
 
-	if (!m_list_dir_closure)
-		throw std::logic_error { "No List_dir handler registered" };
+	assert(m_list_dir_closure && "No List_dir handler registered");
 
-	start_filesystem_watchdog([this](const Hash_vector& hvec) {
+	_start_filesystem_watchdog([this](const Hash_vector& hvec) {
 		on_fs_change(hvec);
-	});
+	}, [this]{ on_sort_change(); }, std::move(populate_user_data));
 }
 
 Tab* Tab_manager::add_tab(const path& pwd, Cursor_cache* cc)
@@ -101,6 +98,12 @@ void Tab_manager::on_fs_change(const Hash_vector& hvec)
 		if (tab_it != m_tabs.end())
 			tab_it->reload_current_path();
 	}
+}
+
+void Tab_manager::on_sort_change()
+{
+	for (Tab& t : m_tabs)
+		t.reload_current_path();
 }
 
 } // namespace hawk

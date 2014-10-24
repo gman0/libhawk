@@ -21,8 +21,8 @@
 #define HAWK_TAB_MANAGER_H
 
 #include <list>
-#include <vector>
 #include "Tab.h"
+#include "Dir_cache.h"
 
 namespace hawk {
 	class Cursor_cache;
@@ -42,7 +42,8 @@ namespace hawk {
 		unsigned m_ncols;
 
 	public:
-		Tab_manager(Type_factory* tf, unsigned ncols);
+		Tab_manager(Type_factory* tf, unsigned ncols,
+					Populate_user_data&& populate_user_data);
 		Tab_manager(const Tab_manager&) = delete;
 		Tab_manager& operator=(const Tab_manager&) = delete;
 		Tab_manager(Tab_manager&&) = delete;
@@ -56,6 +57,7 @@ namespace hawk {
 
 	private:
 		void on_fs_change(const std::vector<size_t>& paths);
+		void on_sort_change();
 	};
 }
 
