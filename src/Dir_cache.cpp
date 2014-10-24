@@ -47,10 +47,12 @@ static bool is_free(const Cache_entry& ent) { return ent.hash == 0; }
 static void shrink(Dir_ptr& ptr)
 {
 	constexpr unsigned max_size = 1024;
-	ptr->resize(max_size);
+
+	if (ptr->size() > max_size)
+		ptr->resize(max_size);
 }
 
-static class Cache_list
+class Cache_list
 {
 public:
 	using Fn = std::function<void(Cache_entry&)>;
@@ -97,7 +99,7 @@ public:
 		while (!m_head.compare_exchange_weak(n->next, n));
 	}
 
-	bool find(size_t path_hash, Cache_entry& out)
+	Dir_ptr find(size_t path_hash)
 	{
 		std::shared_lock<std::shared_timed_mutex> lk {m_smutex};
 
@@ -114,10 +116,10 @@ public:
 					// modified this before setting the state to in_use_block.
 					if (n->ent.hash == path_hash)
 					{
-						out = n->ent;
+						Dir_ptr ptr = n->ent.ptr;
 						n->state.store(Node_state::not_in_use);
 
-						return true;
+						return ptr;
 					}
 
 					n->state.store(Node_state::not_in_use);
@@ -127,7 +129,7 @@ public:
 			n = n->next;
 		}
 
-		return false;
+		return nullptr;
 	}
 
 	void for_each(Fn f)
@@ -256,9 +258,9 @@ private:
 
 		return cont;
 	}
-} s_entries;
+};
 
-static struct Filesystem_watchdog
+struct Filesystem_watchdog
 {
 	std::thread thread;
 	std::atomic<bool> done;
@@ -270,29 +272,50 @@ static struct Filesystem_watchdog
 		done.store(true);
 		thread.join();
 	}
-} s_fs_watchdog;
+};
+
+static struct
+{
+	Cache_list entries;
+	Filesystem_watchdog fs_watchdog;
+
+	On_sort_change_f on_sort_change;
+	Dir_sort_predicate sort_pred;
+	Populate_user_data populate_user_data;
+} s_state;
+
+static void sort_dir(Dir_vector& vec)
+{
+	if (s_state.sort_pred)
+		std::sort(vec.begin(), vec.end(), s_state.sort_pred);
+}
+
+static void populate_user_data(Dir_entry& ent)
+{
+	if (s_state.populate_user_data)
+		s_state.populate_user_data(ent);
+}
 
 // Gather contents of a directory and move them to the out vector
 static void gather_dir_contents(const path& p, Dir_vector& out)
 {
-	soft_interruption_point();
-
 	directory_iterator dir_it_end;
 	for (auto dir_it = directory_iterator {p};
 		 dir_it != dir_it_end;
 		 ++dir_it)
 	{
 		soft_interruption_point();
+
 		Dir_entry dir_ent;
 		dir_ent.path = std::move(*dir_it);
+		populate_user_data(dir_ent);
 
 		soft_interruption_point();
-		boost::system::error_code ec;
-		dir_ent.status = status(dir_ent.path, ec);
 
-		soft_interruption_point();
 		out.push_back(std::move(dir_ent));
 	}
+
+	sort_dir(out);
 }
 
 static void try_update_dir_contents(Cache_entry& ent,
@@ -313,8 +336,8 @@ static void try_update_dir_contents(Cache_entry& ent,
 
 		try { gather_dir_contents(ent.path, *(ent.ptr)); }
 		catch (const filesystem_error&) {}
-		// Ignore any exceptions as we're going to
-		// reload_current_path later anyway.
+		// Ignore any filesystem exceptions as we're
+		// going to reload_current_path later anyway.
 
 		hash_vec.push_back(ent.hash);
 	}
@@ -322,44 +345,65 @@ static void try_update_dir_contents(Cache_entry& ent,
 
 static void fs_watchdog()
 {
-	static std::vector<size_t> hash_vec;
+	std::vector<size_t> hash_vec;
 
-	while (!s_fs_watchdog.done)
+	while (!s_state.fs_watchdog.done)
 	{
-		s_entries.for_each(
-					[](Cache_entry& ent) {
-			if (is_free(ent)) return;
-			try_update_dir_contents(ent, hash_vec);
+		s_state.entries.for_each(
+			[&hash_vec](Cache_entry& ent) {
+				if (is_free(ent)) return;
+				try_update_dir_contents(ent, hash_vec);
 		});
 
 		if (!hash_vec.empty())
 		{
-			try { s_fs_watchdog.on_change(hash_vec); }
+			try { s_state.fs_watchdog.on_change(hash_vec); }
 			catch (...) {} // We can't deal with any exceptions at this point.
 
 			hash_vec.clear();
 		}
 
-		if (!s_fs_watchdog.done.load())
+		if (!s_state.fs_watchdog.done)
 			std::this_thread::sleep_for(std::chrono::seconds {1});
 		else
 			break;
 	}
 }
 
-void start_filesystem_watchdog(On_fs_change_f&& on_fs_change)
+void _start_filesystem_watchdog(On_fs_change_f&& on_fs_change,
+							   On_sort_change_f&& on_sort_change,
+							   Populate_user_data&& populate)
 {
-	s_fs_watchdog.on_change = std::move(on_fs_change);
-	s_fs_watchdog.thread = std::thread {&fs_watchdog};
+	static bool call_once = false;
+	if (!call_once) call_once = true;
+	else assert("hawk::_start_filesystem_watchdog can be called only once!");
+
+
+	s_state.fs_watchdog.on_change = std::move(on_fs_change);
+	s_state.on_sort_change = std::move(on_sort_change);
+	s_state.populate_user_data = std::move(populate);
+	s_state.fs_watchdog.thread = std::thread {&fs_watchdog};
+}
+
+void set_sort_predicate(Dir_sort_predicate&& pred)
+{
+	s_state.sort_pred = std::move(pred);
+
+	s_state.entries.for_each([](Cache_entry& ent) {
+		sort_dir(*ent.ptr);
+	});
+
+	s_state.on_sort_change();
 }
 
 static void build_cache_entry(Cache_entry& ent, const path& p,
-							  size_t path_hash)
+							  size_t path_hash,
+							  std::shared_ptr<Dir_vector>&& ptr)
 {
 	ent.hash = path_hash;
 	ent.timestamp = last_write_time(p);
 	ent.path = p;
-	ent.ptr = std::make_shared<Dir_vector>();
+	ent.ptr = std::move(ptr);
 	gather_dir_contents(p, *ent.ptr);
 }
 
@@ -369,44 +413,41 @@ Dir_ptr get_dir_ptr(const path& p, size_t path_hash)
 
 	try
 	{
-		if (s_entries.find(path_hash, ent))
-			return ent.ptr;
+		Dir_ptr ptr;
+		if ((ptr = s_state.entries.find(path_hash)))
+			return ptr;
 		else
 		{
 			soft_interruption_point();
 
-			s_entries.free_ptrs();
+			s_state.entries.free_ptrs();
 
 			Cache_list::Fn update_entry = [&](Cache_entry& e) {
-				e.hash = path_hash;
-				e.timestamp = last_write_time(p);
-				e.path = p;
-				gather_dir_contents(p, *(e.ptr));
-
-				ent = e;
+				build_cache_entry(e, p, path_hash, std::move(e.ptr));
+				ptr = e.ptr;
 			};
 
 			soft_interruption_point();
 
-			if (s_entries.try_reclaim_free_ptr(update_entry))
-				return ent.ptr;
+			if (s_state.entries.try_reclaim_free_ptr(update_entry))
+				return ptr;
 		}
 
-		build_cache_entry(ent, p, path_hash);
+		build_cache_entry(ent, p, path_hash, std::make_shared<Dir_vector>());
 	}
-	catch (Soft_thread_interrupt)
+	catch (const Soft_thread_interrupt&)
 	{
 		return nullptr;
 	}
 
-	s_entries.push_front(ent);
+	s_state.entries.push_front(ent);
 
 	return ent.ptr;
 }
 
 void destroy_free_dir_ptrs(int free_ptrs)
 {
-	s_entries.delete_free_ptrs(free_ptrs);
+	s_state.entries.delete_free_ptrs(free_ptrs);
 }
 
 } // namespace hawk

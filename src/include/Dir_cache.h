@@ -23,14 +23,14 @@
 #include <memory>
 #include <functional>
 #include <boost/filesystem/path.hpp>
+#include "User_data.h"
 
 namespace hawk
 {
 	struct Dir_entry
 	{
-		std::time_t timestamp;
 		boost::filesystem::path path;
-		boost::filesystem::file_status status;
+		User_data user_data;
 	};
 
 	using Dir_vector = std::vector<Dir_entry>;
@@ -38,17 +38,27 @@ namespace hawk
 	using Dir_const_cursor = Dir_vector::const_iterator;
 	using Dir_ptr = std::shared_ptr<Dir_vector>;
 
+
+	using On_fs_change_f = std::function<
+		void(const std::vector<size_t>&)>;
+	using On_sort_change_f = std::function<void()>;
+	using Dir_sort_predicate = std::function<
+		bool(const Dir_entry&, const Dir_entry&)>;
+	using Populate_user_data = std::function<void(Dir_entry&)>;
+
 	// Starts a thread that checks filesystem every second and
 	// updates cache entries if needed.
-	using On_fs_change_f =
-		std::function<void(const std::vector<size_t>&)>;
-	void start_filesystem_watchdog(On_fs_change_f&& on_fs_change);
+	void _start_filesystem_watchdog(On_fs_change_f&& on_fs_change,
+									On_sort_change_f&& on_sort_change,
+									Populate_user_data&& populate);
+
+	void set_sort_predicate(Dir_sort_predicate&& pred);
 
 	Dir_ptr get_dir_ptr(const boost::filesystem::path& p,
 						size_t path_hash);
 
-	// Destroy free_ptrs free pointers.
-	void destroy_free_dir_ptrs(int free_ptrs);
+	// Destroy nfree_ptrs free pointers.
+	void destroy_free_dir_ptrs(int nfree_ptrs);
 }
 
 #endif // HAWK_DIR_CACHE_H
