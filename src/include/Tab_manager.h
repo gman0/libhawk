@@ -31,27 +31,38 @@ namespace hawk {
 	{
 	public:
 		using Tab_list = std::list<Tab>;
+		using Exception_handler = std::function<
+			void(std::exception_ptr) noexcept>;
 
 	private:
 		Tab_list m_tabs;
 
 		Type_factory* m_type_factory;
 		Type_factory::Handler m_list_dir_closure;
+		Exception_handler m_exception_handler;
 
 		// default number of columns to create
 		unsigned m_ncols;
 
 	public:
 		Tab_manager(Type_factory* tf, unsigned ncols,
-					Populate_user_data&& populate_user_data);
+					Populate_user_data&& populate_user_data,
+					Exception_handler&& eh);
 		Tab_manager(const Tab_manager&) = delete;
 		Tab_manager& operator=(const Tab_manager&) = delete;
 		Tab_manager(Tab_manager&&) = delete;
 		Tab_manager& operator=(Tab_manager&&) = delete;
 
-		// These can return nullptr if the tab construction fails.
-		Tab* add_tab(const boost::filesystem::path& pwd, Cursor_cache* cc);
-		Tab* add_tab(boost::filesystem::path&& pwd, Cursor_cache* cc);
+		template <typename Path>
+		Tab* add_tab(Path&& path)
+		{
+			auto prev_it = --m_tabs.end();
+			m_tabs.emplace_back(std::forward<Path>(path), m_exception_handler,
+								m_ncols, m_type_factory, m_list_dir_closure);
+			auto curr_it = --m_tabs.end();
+
+			return (prev_it == curr_it) ? nullptr : &(*curr_it);
+		}
 
 		Tab_list& get_tabs();
 
