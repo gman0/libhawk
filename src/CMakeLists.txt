@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.8)
 project(libhawk)
 
-set(CMAKE_CXX_FLAGS "-std=c++11 -Wall -pedantic -g -Og -fPIC")
+set(CMAKE_CXX_FLAGS "-std=c++1y -Wall -pedantic -g -O0 -fPIC")
 
 set(Boost_USE_STATIC_LIBS OFF)
 set(Boost_USE_MULTITHREADED ON)
