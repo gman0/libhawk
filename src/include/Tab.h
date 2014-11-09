@@ -23,12 +23,22 @@
 #include <vector>
 #include <memory>
 #include <boost/filesystem/path.hpp>
+#include <utility>
+#include <condition_variable>
+#include <exception>
+#include <functional>
+#include <mutex>
+#include <atomic>
 #include "Type_factory.h"
+#include "Dir_cache.h"
+#include "Interruptible_thread.h"
 #include "handlers/List_dir.h"
 
 namespace hawk {
 	class Cursor_cache;
 	class Column;
+	class List_dir;
+	class Preview;
 
 	/// Exception safety
 	//  User's code can safely throw exceptions with these guarantees:
@@ -50,51 +60,71 @@ namespace hawk {
 	//  Any exception thrown in any of these scenarios will be rethrown back
 	//  to the user.
 
-	// Notice about Column building: when calling build_columns during
-	// Tab construction, Column constructors are called in forward order
+	// A note about Column building: when calling build_columns (during
+	// Tab construction), Column constructors are called in forward order
 	// but their ready methods are called in reverse.
 	class Tab
 	{
 	public:
 		using Column_ptr = std::unique_ptr<Column>;
 		using Column_vector = std::vector<Column_ptr>;
+		using Exception_handler = std::function<
+			void(std::exception_ptr) noexcept>;
 
 	private:
 		boost::filesystem::path m_path;
 
 		Column_vector m_columns;
+		Preview* m_preview;
 		List_dir* m_active_ld;
 
 		Type_factory* m_type_factory;
 		Type_factory::Handler m_list_dir_closure;
 
-		// This one's used to check whether we have
-		// a preview column. Also, we can make the assumption
-		// that only the last column can be a preview and that
-		// there can be only one preview.
-		bool m_has_preview;
+		Interruptible_thread m_tasking_thread;
+		struct Tasking
+		{
+			std::condition_variable cv;
+			std::mutex m;
+			bool ready_for_tasking;
+			std::atomic<bool> global;
+			std::function<void()> task;
 
-		// Cursor_cache is shared between all List_dir handlers
-		// that exist in a particular Tab.
-		Cursor_cache* m_cursor_cache;
+			Exception_handler exception_handler;
+
+			Tasking(Exception_handler& eh)
+				:
+				  ready_for_tasking{true},
+				  global{false},
+				  exception_handler{eh}
+			{}
+
+			void run_task(std::unique_lock<std::mutex>& lk,
+						  std::function<void()>&& f);
+			void operator()();
+		} m_tasking;
 
 	public:
-		Tab(const boost::filesystem::path& path,
-			Cursor_cache* cc,
-			int ncols,
-			Type_factory* tf,
-			const Type_factory::Handler& list_dir_closure);
-		Tab(boost::filesystem::path&& path,
-			Cursor_cache* cc,
-			int ncols,
-			Type_factory* tf,
-			const Type_factory::Handler& list_dir_closure);
+		template <typename Path>
+		Tab(Path&& path, Exception_handler& eh, int ncols, Type_factory* tf,
+			const Type_factory::Handler& list_dir_closure)
+			:
+			  m_path{std::forward<Path>(path)},
+			  m_type_factory{tf},
+			  m_list_dir_closure{list_dir_closure},
+			  m_tasking{eh}
+		{
+			build_columns(--ncols);
+			m_tasking_thread = Interruptible_thread {std::ref(m_tasking)};
+		}
+
+		~Tab();
+
+		Tab(const Tab&) = delete;
+		Tab& operator=(const Tab&) = delete;
 
 		const boost::filesystem::path& get_path() const;
 		void set_path(boost::filesystem::path path);
-		// Reloads Tab with current path. It's nearly the same
-		// as calling set_path(get_path()) but it's thread safe.
-		void reload_current_path();
 
 		const Column_vector& get_columns() const;
 		List_dir* const get_active_list_dir() const;
@@ -122,6 +152,8 @@ namespace hawk {
 		void add_preview(const boost::filesystem::path& path);
 		// Has no effect when there's no preview column.
 		void remove_preview();
+
+		void task_set_path(const boost::filesystem::path& path);
 	};
 }
 

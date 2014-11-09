@@ -22,34 +22,65 @@
 #include <algorithm>
 #include <utility>
 #include <exception>
-#include <mutex>
-#include <thread>
 #include <chrono>
-#include <atomic>
 #include "Tab.h"
-#include "Cursor_cache.h"
 #include "Column.h"
+#include "handlers/List_dir.h"
 #include "Dir_cache.h"
+#include "Interruptible_thread.h"
+#include "Interrupt.h"
 
 using namespace boost::filesystem;
 
 namespace hawk {
 
-static std::mutex s_mutex;
-static std::mutex s_path_mutex;
-static std::mutex s_cursor_mutex;
-
-static void dissect_path(path& p, int ncols, std::vector<path>& out)
+class Preview
 {
-	for (int i = 0; i < ncols; i++)
-		out.emplace_back();
+private:
+	std::unique_ptr<Column> m_column;
+	Type_factory* m_type_factory;
 
-	--ncols;
+public:
+	Preview(Type_factory* tf) : m_type_factory{tf} {}
+
+	void create()
+	{
+
+	}
+
+	void destroy()
+	{
+
+	}
+
+	void cancel()
+	{
+
+	}
+
+	bool has_preview() { return static_cast<bool>(m_column); }
+};
+
+struct Global_guard
+{
+	std::atomic<bool>& global;
+	Global_guard(std::atomic<bool>& glob) : global{glob}
+	{ global.store(true, std::memory_order_release); }
+	~Global_guard()
+	{ global.store(false, std::memory_order_release); }
+};
+
+static std::vector<path> dissect_path(path& p, int ncols)
+{
+	std::vector<path> paths(ncols + 1);
+
 	for (; ncols >= 0; ncols--)
 	{
-		out[ncols] = p;
+		paths[ncols] = p;
 		p = p.parent_path();
 	}
+
+	return paths;
 }
 
 static int get_empty_columns(const Tab::Column_vector& col_vec)
@@ -64,6 +95,7 @@ static int get_empty_columns(const Tab::Column_vector& col_vec)
 	return n;
 }
 
+// Fool-proof check for directory reading privileges.
 static bool dir_readable(const path& p)
 {
 	boost::system::error_code ec;
@@ -89,30 +121,21 @@ static void check_and_rollback_path(path& p, const path& old_p)
 		p = "/";
 }
 
-Tab::Tab(const path& p, Cursor_cache* cc, int ncols,
-		 Type_factory* tf, const Type_factory::Handler& list_dir_closure)
-	:
-	  m_path{p},
-	  m_columns{},
-	  m_type_factory{tf},
-	  m_list_dir_closure{list_dir_closure},
-	  m_has_preview{false},
-	  m_cursor_cache{cc}
+Tab::~Tab()
 {
-	build_columns(ncols);
-}
+	if (!m_tasking_thread.joinable())
+		return;
 
-Tab::Tab(path&& p, Cursor_cache* cc, int ncols,
-		 Type_factory* tf, const Type_factory::Handler& list_dir_closure)
-	:
-	  m_path{std::move(p)},
-	  m_columns{},
-	  m_type_factory{tf},
-	  m_list_dir_closure{list_dir_closure},
-	  m_has_preview{false},
-	  m_cursor_cache{cc}
-{
-	build_columns(ncols);
+	m_tasking_thread.soft_interrupt();
+
+	std::unique_lock<std::mutex> lk {m_tasking.m};
+	m_tasking_thread.hard_interrupt();
+	m_tasking.run_task(lk, []{
+		for (;;)
+			hard_interruption_point();
+	});
+
+	m_tasking_thread.join();
 }
 
 const path& Tab::get_path() const
@@ -120,50 +143,36 @@ const path& Tab::get_path() const
 	return m_path;
 }
 
+void Tab::task_set_path(const path& p)
+{
+	Global_guard gg {m_tasking.global};
+
+	update_paths(p);
+	soft_interruption_point();
+
+	update_active_cursor();
+	destroy_free_dir_ptrs(get_empty_columns(m_columns) + 1);
+	soft_interruption_point();
+
+	m_path = p;
+}
+
 void Tab::set_path(path p)
 {
-	std::exception_ptr eptr;
 	try { p = canonical(p, m_path); }
-	catch (...) { eptr = std::current_exception(); }
+	catch (...) { m_tasking.exception_handler(std::current_exception()); }
 
 	if (p.empty())
 		p = "/";
-
-	{
-		std::lock_guard<std::mutex> lk {s_mutex};
+	else
 		check_and_rollback_path(p, m_path);
-		update_paths(p);
-		update_active_cursor();
-		destroy_free_dir_ptrs(get_empty_columns(m_columns));
 
-		std::lock_guard<std::mutex> lk_path {s_path_mutex};
-		m_path = std::move(p);
-	}
+	m_tasking_thread.soft_interrupt();
 
-	if (eptr)
-		std::rethrow_exception(eptr);
-}
-
-void Tab::reload_current_path()
-{
-	path p;
-
-	{
-		std::unique_lock<std::mutex> lk {s_path_mutex, std::defer_lock};
-		for (;;)
-		{
-			lk.lock();
-			p = m_path;
-			lk.unlock();
-			std::this_thread::sleep_for(std::chrono::milliseconds{1});
-			lk.lock();
-			if (p == m_path) break;
-			lk.unlock();
-			std::this_thread::sleep_for(std::chrono::milliseconds{1});
-		}
-	}
-
-	set_path(p);
+	std::unique_lock<std::mutex> lk {m_tasking.m};
+	m_tasking.run_task(lk, [&, p]{
+		task_set_path(p);
+	});
 }
 
 const Tab::Column_vector& Tab::get_columns() const
@@ -178,7 +187,6 @@ List_dir* const Tab::get_active_list_dir() const
 
 void Tab::set_cursor(Dir_cursor cursor)
 {
-	std::lock_guard<std::mutex> lk {s_cursor_mutex};
 	if (prepare_cursor())
 	{
 		// Set the cursor in the active column.
@@ -190,7 +198,6 @@ void Tab::set_cursor(Dir_cursor cursor)
 
 void Tab::set_cursor(const path& p)
 {
-	std::lock_guard<std::mutex> lk {s_cursor_mutex};
 	if (prepare_cursor())
 	{
 		// Set the cursor in the active column.
@@ -212,7 +219,7 @@ void Tab::build_columns(int ncols)
 void Tab::instantiate_columns(int ncols)
 {
 	add_column(m_list_dir_closure);
-	for (int i = 1; i < ncols; i++)
+	for (int i = 1; i <= ncols; i++)
 	{
 		add_column(m_list_dir_closure);
 		m_columns[i - 1]->_set_next_column(m_columns[i].get());
@@ -221,24 +228,20 @@ void Tab::instantiate_columns(int ncols)
 
 void Tab::initialize_columns(int ncols)
 {
-	std::vector<path> path_vec;
-	path_vec.clear();
-
 	path p = m_path;
-	dissect_path(p, ncols, path_vec);
+	std::vector<path> paths = dissect_path(p, ncols);
 
-	--ncols;
 	for (; ncols >= 0; ncols--)
-		ready_column(m_columns[ncols], path_vec[ncols]);
+		ready_column(m_columns[ncols], paths[ncols]);
 }
 
 void Tab::update_paths(path p)
 {
 	int ncols = m_columns.size();
 
-	if (m_has_preview)
-		ncols -= 2;
-	else
+//	if (m_has_preview)
+//		ncols -= 2;
+//	else
 		--ncols;
 
 	ready_column(m_columns[ncols], p);
@@ -262,7 +265,7 @@ void Tab::ready_column(Column_ptr& col, const path& p)
 
 void Tab::update_active_cursor()
 {
-	set_cursor(m_active_ld->get_cursor());
+	//set_cursor(m_active_ld->get_cursor());
 }
 
 void Tab::activate_last_column()
@@ -291,7 +294,7 @@ void Tab::add_preview(const path& p)
 
 	try
 	{
-		m_has_preview = true;
+//		m_has_preview = true;
 		ready_column(m_columns.back(), p);
 	}
 	catch (...)
@@ -303,10 +306,58 @@ void Tab::add_preview(const path& p)
 
 void Tab::remove_preview()
 {
+	/*
 	if (m_has_preview)
 	{
 		m_columns.pop_back();
 		m_has_preview = false;
+	}
+	*/
+}
+
+void Tab::Tasking::run_task(std::unique_lock<std::mutex>& lk,
+							std::function<void()>&& f)
+{
+	cv.wait(lk, [this]{ return ready_for_tasking; });
+
+	ready_for_tasking = false;
+	task = std::move(f);
+
+	lk.unlock();
+	cv.notify_one();
+}
+
+void Tab::Tasking::operator()()
+{
+	std::unique_lock<std::mutex> lk {m, std::defer_lock};
+
+	auto start_task = [&]{
+		lk.lock();
+		cv.wait(lk, [this]{ return !ready_for_tasking; });
+		_soft_iflag.clear();
+		lk.unlock();
+		cv.notify_one();
+	};
+
+	auto end_task = [&]{
+		lk.lock();
+		ready_for_tasking = true;
+		lk.unlock();
+		cv.notify_one();
+	};
+
+	for (;;)
+	{
+		start_task();
+
+		try { task(); }
+		catch (const Soft_thread_interrupt&) {}
+		catch (const Hard_thread_interrupt&) { throw; }
+		catch (...) {
+			exception_handler(std::current_exception());
+		}
+
+		end_task();
 	}
 }
 
