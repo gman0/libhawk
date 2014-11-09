@@ -33,6 +33,8 @@ namespace hawk {
 		Interrupt_flag* m_soft_iflag;
 
 	public:
+		Interruptible_thread() {}
+
 		template <typename Function, typename... Args>
 		explicit Interruptible_thread(Function&& f, Args&&... args)
 		{
@@ -45,24 +47,24 @@ namespace hawk {
 
 				try {
 					f(std::forward<Args>(args)...);
-				} catch (const Hard_thread_interrupt&)
-				{}
+				} catch (const Hard_thread_interrupt&) {}
 			});
 
 			m_hard_iflag = hard.get_future().get();
 			m_soft_iflag = soft.get_future().get();
 		}
 
+		Interruptible_thread(Interruptible_thread&& ithread) noexcept;
+		Interruptible_thread& operator=(
+				Interruptible_thread&& ithread) noexcept;
+
 		~Interruptible_thread();
 
 		Interruptible_thread(const Interruptible_thread&) = delete;
 		Interruptible_thread& operator=(const Interruptible_thread&) = delete;
 
-		Interruptible_thread(Interruptible_thread&& ithread);
-		Interruptible_thread& operator=(Interruptible_thread&& ithread);
-
 		void join();
-		bool joinable();
+		bool joinable() const;
 
 		void hard_interrupt();
 		void soft_interrupt();

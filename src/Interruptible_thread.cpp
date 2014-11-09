@@ -22,10 +22,42 @@
 
 namespace hawk {
 
+Interruptible_thread::Interruptible_thread(
+		Interruptible_thread&& ithread) noexcept
+	:
+	  m_thread{std::move(ithread.m_thread)},
+	  m_hard_iflag{ithread.m_hard_iflag},
+	  m_soft_iflag{ithread.m_soft_iflag}
+{
+	ithread.m_hard_iflag = nullptr;
+	ithread.m_soft_iflag = nullptr;
+}
+
+Interruptible_thread& Interruptible_thread::operator=(
+		Interruptible_thread&& ithread) noexcept
+{
+	if (this == &ithread)
+		return *this;
+
+	m_thread = std::move(ithread.m_thread);
+	m_hard_iflag = ithread.m_hard_iflag;
+	m_soft_iflag = ithread.m_soft_iflag;
+
+	ithread.m_hard_iflag = nullptr;
+	ithread.m_soft_iflag = nullptr;
+
+	return *this;
+}
+
 Interruptible_thread::~Interruptible_thread()
 {
 	if (m_thread.joinable())
 		join();
+}
+
+bool Interruptible_thread::joinable() const
+{
+	return m_thread.joinable();
 }
 
 void Interruptible_thread::join()
