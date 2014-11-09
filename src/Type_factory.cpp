@@ -83,11 +83,9 @@ void Type_factory::register_type(size_t type,
 Type_factory::Handler Type_factory::operator[](size_t type)
 {
 	auto it = std::find_if(m_types.begin(), m_types.end(),
-		[&type](const Type_map::value_type& v)
-		{
+		[type](const Type_map::value_type& v) {
 			return find_predicate(v, type);
-		}
-	);
+	});
 
 	if (it == m_types.end())
 		return Handler {nullptr};
@@ -114,8 +112,7 @@ Type_factory::Handler Type_factory::get_handler(size_t type)
 	return operator[](type);
 }
 
-Type_factory::Handler Type_factory::get_handler(
-		const boost::filesystem::path& p)
+Type_factory::Handler Type_factory::get_handler(const path& p)
 {
 	return operator[](p);
 }
