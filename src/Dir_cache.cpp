@@ -142,20 +142,16 @@ public:
 	{
 		std::shared_lock<std::shared_timed_mutex> lk {m_smutex};
 
-		Node* n = m_head.load();
-		while(n)
+		for (Node* n = m_head.load(); n != nullptr; n = n->next)
 		{
-			if (n->state.load() != Node_state::in_use_skip)
+			if (is_free(n->ent)) continue;
+			if (wait_for_state(n->state, Node_state::in_use_block,
+							   Node_state::in_use_skip))
 			{
-				if (wait_for_state(n->state, Node_state::in_use_block,
-								   Node_state::in_use_skip))
-				{
-					f(n->ent);
-					n->state.store(Node_state::not_in_use);
-				}
+				if (is_free(n->ent)) continue;
+				f(n->ent);
+				n->state.store(Node_state::not_in_use);
 			}
-
-			n = n->next;
 		}
 	}
 
@@ -333,8 +329,6 @@ static void try_update_dir_contents(Cache_entry& ent,
 	{
 		if (ent.ptr.use_count() == 1)
 			free_ptr(ent);
-		else
-			hash_vec.push_back(ent.hash);
 
 		return;
 	}
@@ -366,7 +360,6 @@ static void fs_watchdog()
 	while (!s_state.fs_watchdog.done)
 	{
 		s_state.entries.for_each([&hash_vec](Cache_entry& ent) {
-			if (is_free(ent)) return;
 			try_update_dir_contents(ent, hash_vec);
 		});
 
@@ -405,8 +398,7 @@ void set_sort_predicate(Dir_sort_predicate&& pred)
 	s_state.sort_pred = std::move(pred);
 
 	s_state.entries.for_each([](Cache_entry& ent) {
-		if (!is_free(ent))
-			sort_dir(*ent.ptr);
+		sort_dir(*ent.ptr);
 	});
 
 	s_state.on_sort_change();
