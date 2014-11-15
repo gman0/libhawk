@@ -28,7 +28,9 @@
 #include <exception>
 #include <functional>
 #include <mutex>
+#include <shared_mutex>
 #include <atomic>
+#include <chrono>
 #include "Type_factory.h"
 #include "Dir_cache.h"
 #include "Interruptible_thread.h"
@@ -67,16 +69,20 @@ namespace hawk {
 	{
 	public:
 		using Column_ptr = std::unique_ptr<Column>;
-		using Column_vector = std::vector<Column_ptr>;
+		using List_dir_ptr = std::unique_ptr<List_dir>;
+		using List_dir_vector = std::vector<List_dir_ptr>;
 		using Exception_handler = std::function<
 			void(std::exception_ptr) noexcept>;
 
 	private:
+		mutable std::shared_timed_mutex m_path_sm;
 		boost::filesystem::path m_path;
 
-		Column_vector m_columns;
-		Preview* m_preview;
-		List_dir* m_active_ld;
+		List_dir_vector m_columns;
+		Column_ptr m_preview;
+		std::chrono::milliseconds m_preview_delay;
+		std::chrono::time_point<
+			std::chrono::steady_clock> m_preview_timestamp;
 
 		Type_factory* m_type_factory;
 		Type_factory::Handler m_list_dir_closure;
@@ -107,9 +113,11 @@ namespace hawk {
 	public:
 		template <typename Path>
 		Tab(Path&& path, Exception_handler& eh, int ncols, Type_factory* tf,
-			const Type_factory::Handler& list_dir_closure)
+			const Type_factory::Handler& list_dir_closure,
+			std::chrono::milliseconds preview_delay)
 			:
 			  m_path{std::forward<Path>(path)},
+			  m_preview_delay{preview_delay},
 			  m_type_factory{tf},
 			  m_list_dir_closure{list_dir_closure},
 			  m_tasking{eh}
@@ -123,11 +131,10 @@ namespace hawk {
 		Tab(const Tab&) = delete;
 		Tab& operator=(const Tab&) = delete;
 
-		const boost::filesystem::path& get_path() const;
+		boost::filesystem::path get_path() const;
 		void set_path(boost::filesystem::path path);
 
-		const Column_vector& get_columns() const;
-		List_dir* const get_active_list_dir() const;
+		const List_dir_vector& get_columns() const;
 
 		void set_cursor(Dir_cursor cursor);
 		void set_cursor(const boost::filesystem::path& path);
@@ -139,21 +146,19 @@ namespace hawk {
 
 		void update_paths(boost::filesystem::path path);
 		void update_active_cursor();
-		void activate_last_column();
 		// Used when calling set_cursor(). Returns true if
 		// the cursor can be safely set.
-		bool prepare_cursor();
+		bool can_set_cursor();
 
 		void add_column(const Type_factory::Handler& closure);
 		// Sets column's path and calls its ready().
-		void ready_column(Column_ptr& col, const boost::filesystem::path& path);
+		void ready_column(Column& col, const boost::filesystem::path& path);
 
-		// Has no effect when no handler exists for such file type.
-		void add_preview(const boost::filesystem::path& path);
-		// Has no effect when there's no preview column.
-		void remove_preview();
+		void create_preview(const boost::filesystem::path& path);
+		void destroy_preview();
 
 		void task_set_path(const boost::filesystem::path& path);
+		void task_create_preview(const boost::filesystem::path& path);
 	};
 }
 

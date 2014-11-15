@@ -34,33 +34,6 @@ using namespace boost::filesystem;
 
 namespace hawk {
 
-class Preview
-{
-private:
-	std::unique_ptr<Column> m_column;
-	Type_factory* m_type_factory;
-
-public:
-	Preview(Type_factory* tf) : m_type_factory{tf} {}
-
-	void create()
-	{
-
-	}
-
-	void destroy()
-	{
-
-	}
-
-	void cancel()
-	{
-
-	}
-
-	bool has_preview() { return static_cast<bool>(m_column); }
-};
-
 struct Global_guard
 {
 	std::atomic<bool>& global;
@@ -83,10 +56,10 @@ static std::vector<path> dissect_path(path& p, int ncols)
 	return paths;
 }
 
-static int get_empty_columns(const Tab::Column_vector& col_vec)
+static int get_empty_columns(const Tab::List_dir_vector& ld_vec)
 {
 	int n = 0;
-	for (auto& col : col_vec)
+	for (auto& col : ld_vec)
 	{
 		if (col->get_path().empty())
 			++n;
@@ -138,8 +111,15 @@ Tab::~Tab()
 	m_tasking_thread.join();
 }
 
-const path& Tab::get_path() const
+path Tab::get_path() const
 {
+	path p;
+
+	{
+		std::shared_lock<std::shared_timed_mutex> lk {m_path_sm};
+		p = m_path;
+	}
+
 	return m_path;
 }
 
@@ -154,7 +134,10 @@ void Tab::task_set_path(const path& p)
 	destroy_free_dir_ptrs(get_empty_columns(m_columns) + 1);
 	soft_interruption_point();
 
-	m_path = p;
+	{
+		std::lock_guard<std::shared_timed_mutex> lk {m_path_sm};
+		m_path = p;
+	}
 }
 
 void Tab::set_path(path p)
@@ -175,35 +158,26 @@ void Tab::set_path(path p)
 	});
 }
 
-const Tab::Column_vector& Tab::get_columns() const
+const Tab::List_dir_vector& Tab::get_columns() const
 {
 	return m_columns;
 }
 
-List_dir* const Tab::get_active_list_dir() const
-{
-	return m_active_ld;
-}
-
 void Tab::set_cursor(Dir_cursor cursor)
 {
-	if (prepare_cursor())
+	if (can_set_cursor())
 	{
-		// Set the cursor in the active column.
-		m_active_ld->set_cursor(cursor);
-		// Add a new preview column if we can.
-		add_preview(cursor->path);
+		m_columns.back()->set_cursor(cursor);
+		create_preview(cursor->path);
 	}
 }
 
 void Tab::set_cursor(const path& p)
 {
-	if (prepare_cursor())
+	if (can_set_cursor())
 	{
-		// Set the cursor in the active column.
-		m_active_ld->set_cursor(p);
-		// Add a new preview column if we can.
-		add_preview(p);
+		m_columns.back()->set_cursor(p);
+		create_preview(p);
 	}
 }
 
@@ -212,7 +186,6 @@ void Tab::build_columns(int ncols)
 	instantiate_columns(ncols);
 	initialize_columns(ncols);
 
-	activate_last_column();
 	update_active_cursor();
 }
 
@@ -232,87 +205,91 @@ void Tab::initialize_columns(int ncols)
 	std::vector<path> paths = dissect_path(p, ncols);
 
 	for (; ncols >= 0; ncols--)
-		ready_column(m_columns[ncols], paths[ncols]);
+		ready_column(*m_columns[ncols], paths[ncols]);
 }
 
 void Tab::update_paths(path p)
 {
-	int ncols = m_columns.size();
+	int ncols = m_columns.size() - 1;
 
-//	if (m_has_preview)
-//		ncols -= 2;
-//	else
-		--ncols;
-
-	ready_column(m_columns[ncols], p);
+	ready_column(*m_columns[ncols], p);
 	for (int i = ncols - 1; i >= 0; i--)
 	{
 		p = p.parent_path();
-		ready_column(m_columns[i], p);
+		ready_column(*m_columns[i], p);
 	}
 }
 
 void Tab::add_column(const Type_factory::Handler& closure)
 {
-	m_columns.emplace_back(closure());
+	m_columns.emplace_back(static_cast<List_dir*>(closure()));
 }
 
-void Tab::ready_column(Column_ptr& col, const path& p)
+void Tab::ready_column(Column& col, const path& p)
 {
-	col->set_path(p);
-	col->ready();
+	col.set_path(p);
+	col.ready();
 }
 
 void Tab::update_active_cursor()
 {
-	//set_cursor(m_active_ld->get_cursor());
+	if (can_set_cursor())
+		task_create_preview(m_columns.back()->get_cursor()->path);
 }
 
-void Tab::activate_last_column()
+bool Tab::can_set_cursor()
 {
-	m_active_ld = static_cast<List_dir*>(m_columns.back().get());
+	destroy_preview();
+	return !m_columns.back()->get_contents().empty();
 }
 
-bool Tab::prepare_cursor()
+void Tab::create_preview(const path& p)
 {
-	// Remove the preview column if there's one.
-	remove_preview();
-	// Reset the active column.
-	activate_last_column();
-
-	return !m_active_ld->get_contents().empty();
-}
-
-void Tab::add_preview(const path& p)
-{
-	Type_factory::Handler closure = m_type_factory->get_handler(p);
-
-	if (!closure)
+	std::unique_lock<std::mutex> lk {m_tasking.m};
+	if (m_tasking.global.load(std::memory_order_acquire))
 		return;
 
-	add_column(closure);
+	m_tasking_thread.soft_interrupt();
+	m_tasking.run_task(lk, [&, p]{
+		// If the user is scrolling cursor too fast, don't
+		// create the preview immediately. Instead, wait
+		// m_preview_delay milliseconds, while checking for
+		// interrupts,
+		auto now = std::chrono::steady_clock::now();
+		if (m_preview_delay + m_preview_timestamp > now)
+		{
+			for (auto t = m_preview_delay; t.count() != 0; --t)
+			{
+				std::this_thread::sleep_for(
+							std::chrono::milliseconds{1});
+				soft_interruption_point();
+			}
+		}
 
-	try
-	{
-//		m_has_preview = true;
-		ready_column(m_columns.back(), p);
-	}
+		m_preview_timestamp = now;
+		task_create_preview(p);
+	});
+}
+
+void Tab::task_create_preview(const path& p)
+{
+	auto handler = m_type_factory->get_handler(p);
+	if (!handler) return;
+
+	m_preview.reset(handler());
+	soft_interruption_point();
+
+	try { ready_column(*m_preview, p); }
 	catch (...)
 	{
-		remove_preview();
+		destroy_preview();
 		throw;
 	}
 }
 
-void Tab::remove_preview()
+void Tab::destroy_preview()
 {
-	/*
-	if (m_has_preview)
-	{
-		m_columns.pop_back();
-		m_has_preview = false;
-	}
-	*/
+	m_preview.reset();
 }
 
 void Tab::Tasking::run_task(std::unique_lock<std::mutex>& lk,
