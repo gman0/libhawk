@@ -58,7 +58,8 @@ namespace hawk {
 		{
 			auto prev_it = --m_tabs.end();
 			m_tabs.emplace_back(std::forward<Path>(path), m_exception_handler,
-								m_ncols, m_type_factory, m_list_dir_closure);
+								m_ncols, m_type_factory, m_list_dir_closure,
+								std::chrono::milliseconds{50});
 			auto curr_it = --m_tabs.end();
 
 			return (prev_it == curr_it) ? nullptr : &(*curr_it);

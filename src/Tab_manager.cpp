@@ -62,18 +62,18 @@ void Tab_manager::on_fs_change(const Hash_vector& hvec)
 		auto tab_it = m_tabs.begin();
 		for (; tab_it != m_tabs.end(); ++tab_it)
 		{
-			const Tab::Column_vector& col_vec = tab_it->get_columns();
+			const Tab::List_dir_vector& ld_vec = tab_it->get_columns();
 
 			// Try to find a columns with the supplied path.
 			// It's more likely that the result will be found quicker
 			// when we'll be searching for it in reverse order.
 			const auto col_it = std::find_if(
-						col_vec.crbegin(), col_vec.crend(),
-						[path_hash](const Tab::Column_ptr& col) {
+						ld_vec.crbegin(), ld_vec.crend(),
+						[path_hash](const Tab::List_dir_ptr& col) {
 					return hash_value(col->get_path()) == path_hash;
 			});
 
-			if (col_it != col_vec.rend())
+			if (col_it != ld_vec.rend())
 				break;
 		}
 
