@@ -41,15 +41,6 @@ namespace hawk {
 		// which will be used as a key in m_cursor_cache.
 		size_t m_path_hash;
 
-		// This flag stores the type of cursor acquisition:
-		//  * implicit (true) - acquired as begin/end cursor
-		//  * explicit - everything else
-		//
-		// It can be used e.g. when the resulting item container
-		// is sorted (the original vector is NOT sorted) - begin()
-		// will point to a different item, thus we need a way to
-		// inform the user about this.
-		bool m_implicit_cursor;
 	protected:
 		Dir_ptr m_dir_ptr;
 		Dir_cursor m_cursor;
@@ -58,16 +49,13 @@ namespace hawk {
 		List_dir(Cursor_cache* cc)
 			:
 			  m_cursor_cache{cc},
-			  m_path_hash{0},
-			  m_implicit_cursor{true}
+			  m_path_hash{0}
 		{}
 
 		List_dir(const List_dir&) = delete;
 		List_dir(List_dir&& ld) noexcept;
 		List_dir& operator=(List_dir&& ld) noexcept;
 
-		// Get a reference to the vector of current directory's contents.
-		Dir_vector& get_contents() { return *m_dir_ptr; }
 		const Dir_vector& get_contents() const { return *m_dir_ptr; }
 
 		Dir_cursor get_cursor() const { return m_cursor; }
@@ -88,13 +76,8 @@ namespace hawk {
 
 		virtual void set_path(const boost::filesystem::path& path);
 
-		// (see m_implicit_cursor member)
-		bool implicit_cursor() const { return m_implicit_cursor; }
-
 	private:
-		// Returns true if the cursor was acquired implicity,
-		// otherwise false.
-		bool acquire_cursor();
+		void acquire_cursor();
 	};
 }
 

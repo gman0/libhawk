@@ -77,19 +77,18 @@ List_dir& List_dir::operator=(List_dir&& ld) noexcept
 	m_path_hash = ld.m_path_hash;
 	m_dir_ptr = std::move(ld.m_dir_ptr);
 	m_cursor = std::move(ld.m_cursor);
-	m_implicit_cursor = ld.m_implicit_cursor;
 
 	ld.m_cursor_cache = nullptr;
 
 	return *this;
 }
 
-bool List_dir::acquire_cursor()
+void List_dir::acquire_cursor()
 {
 	if (m_next_column)
 	{
 		set_cursor(get_next_path()->filename());
-		return false;
+		return;
 	}
 
 	Cursor_cache::Cursor cursor_hash_it;
@@ -102,15 +101,13 @@ bool List_dir::acquire_cursor()
 		m_cursor = match_cursor_absolute(*m_dir_ptr, cursor_hash_it->second);
 
 		if (m_cursor != m_dir_ptr->end())
-			return false;
+			return;
 	}
 
 	// We didn't find the cursor, let's use the first
 	// item of our Dir_vector as the cursor (or the
 	// end() iterator if the vector is empty).
 	m_cursor = m_dir_ptr->begin();
-
-	return true;
 }
 
 void List_dir::set_cursor(Dir_cursor cursor)
@@ -121,7 +118,6 @@ void List_dir::set_cursor(Dir_cursor cursor)
 		return;
 
 	m_cursor_cache->store(m_path_hash, hash_value(m_cursor->path));
-	m_implicit_cursor = false;
 }
 
 void List_dir::set_cursor(const path& filename)
@@ -138,11 +134,7 @@ bool List_dir::try_get_cursor(const boost::filesystem::path& filename,
 							  Dir_cursor& cur)
 {
 	cur = match_cursor_filename(*m_dir_ptr, filename);
-
-	if (cur != m_dir_ptr->end())
-		return true;
-	else
-		return false;
+	return cur != m_dir_ptr->end();
 }
 
 bool List_dir::try_get_const_cursor(const boost::filesystem::path& filename,
@@ -178,7 +170,7 @@ void List_dir::set_path(const path& dir)
 
 	m_path_hash = hash_value(dir);
 	m_dir_ptr = get_dir_ptr(dir, m_path_hash);
-	m_implicit_cursor = acquire_cursor();
+	acquire_cursor();
 }
 
 } // namespace hawk
