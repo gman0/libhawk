@@ -251,10 +251,10 @@ void Tab::create_preview(const path& p)
 
 	m_tasking_thread.soft_interrupt();
 	m_tasking.run_task(lk, [&, p]{
-		// If the user is scrolling cursor too fast, don't
+		// If the user is scrolling the cursor too fast, don't
 		// create the preview immediately. Instead, wait
 		// m_preview_delay milliseconds, while checking for
-		// interrupts,
+		// interrupts.
 		auto now = std::chrono::steady_clock::now();
 		if (m_preview_delay + m_preview_timestamp > now)
 		{
