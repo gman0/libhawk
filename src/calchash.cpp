@@ -1,5 +1,5 @@
 /*
-	Copyright (C) 2013-2014 Róbert "gman" Vašek <gman@codefreax.org>
+	Copyright (C) 2013-2015 Róbert "gman" Vašek <gman@codefreax.org>
 
 	This file is part of libhawk.
 
@@ -30,7 +30,7 @@ size_t calculate_mime_hash(std::string mime)
 
 	constexpr int half_size_t = sizeof(size_t) * 4;
 	static char split[256];
-	
+
 	// First, we need to check whether we even have
 	// the second (specific) part of the mime-type.
 	auto slash_pos = mime.find('/');
@@ -56,7 +56,7 @@ size_t calculate_mime_hash(std::string mime)
 	// Now we'll calculate the 2nd hash which is located just
 	// past the '/' character (which is now '\0').
 	mime = split + slash_pos + 1;
-	// The calculated hash has will now fill the lower half of
+	// The calculated hash will now fill the lower half of
 	// the resulting hash.
 	hash |= std::hash<std::string>()(mime) >> half_size_t;
 

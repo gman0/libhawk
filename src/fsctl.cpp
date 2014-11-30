@@ -1,5 +1,5 @@
 /*
-	Copyright (C) 2013-2014 Róbert "gman" Vašek <gman@codefreax.org>
+	Copyright (C) 2013-2015 Róbert "gman" Vašek <gman@codefreax.org>
 
 	This file is part of libhawk.
 
@@ -109,6 +109,7 @@ void copy(const path& src, const path& dst)
 			copy_preserve_name(*it, dest / (p.native().c_str() + src_len));
 		}
 	}
+	/// XXX: copy the attributes too!
 }
 
 void copy(const path& src, const path& dest, error_code& ec) noexcept
