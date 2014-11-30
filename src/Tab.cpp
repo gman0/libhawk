@@ -69,13 +69,13 @@ static int get_empty_columns(const Tab::List_dir_vector& ld_vec)
 // Checks path for validity
 static void check_and_rollback_path(Path& p, const Path& old_p)
 {
-	if (directory_readable(p)) return; // We're good to go.
+	if (is_readable(p)) return; // We're good to go.
 
 	p = old_p; // Roll back to the previous path.
-	if (directory_readable(p)) return;
+	if (is_readable(p)) return;
 
 	// Otherwise roll back to the parent directory until it's readable.
-	while (!directory_readable(p))
+	while (!is_readable(p))
 		p = p.parent_path();
 
 	if (p.empty())

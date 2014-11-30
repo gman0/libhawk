@@ -108,14 +108,15 @@ void List_dir::set_path(const Path& dir)
 		return;
 	}
 
-	if (!is_directory(dir))
+	struct stat st = status(dir);
+
+	if (!is_directory(st))
 		throw Filesystem_error {dir, ENOTDIR};
 
-	if (access(dir.c_str(), R_OK) == -1)
+	if (!is_readable(st))
 		throw Filesystem_error {dir, EPERM};
 
 	Column::set_path(dir);
-
 	m_dir_ptr = get_dir_ptr(dir);
 	acquire_cursor();
 }

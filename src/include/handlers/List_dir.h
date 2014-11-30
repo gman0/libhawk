@@ -25,7 +25,6 @@
 #include <ctime>
 #include <utility>
 #include "Column.h"
-#include "No_hash.h"
 #include "Dir_cache.h"
 
 namespace hawk {
