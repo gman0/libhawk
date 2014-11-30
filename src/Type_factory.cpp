@@ -27,7 +27,7 @@ constexpr int half_size_t = sizeof(size_t) * 4;
 
 namespace hawk {
 
-using Type_map = std::unordered_map<size_t, Type_factory::Handler, No_hash>;
+using Type_map = std::unordered_map<size_t, Type_factory::Handler>;
 
 struct Magic_guard
 {

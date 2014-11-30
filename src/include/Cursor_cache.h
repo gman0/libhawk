@@ -21,7 +21,6 @@
 #define HAWK_CURSOR_CACHE_H
 
 #include <unordered_map>
-#include "No_hash.h"
 
 namespace hawk {
 	class Cursor_cache
@@ -31,9 +30,7 @@ namespace hawk {
 		// the cursor belongs to (key) and the second size_t
 		// is the item in the directory to which the cursor
 		// points to.
-		using Map =
-			std::unordered_map<size_t, size_t, No_hash>;
-
+		using Map = std::unordered_map<size_t, size_t>;
 		using Cursor = Map::iterator;
 
 	private:

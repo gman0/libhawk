@@ -25,7 +25,6 @@
 #include <vector>
 #include <utility>
 #include "Path.h"
-#include "No_hash.h"
 #include "Column.h"
 
 namespace hawk {
@@ -38,7 +37,7 @@ namespace hawk {
 
 	private:
 		Magic_guard* m_magic_guard;
-		std::unordered_map<size_t, Handler, No_hash> m_types;
+		std::unordered_map<size_t, Handler> m_types;
 
 	public:
 		Type_factory();
