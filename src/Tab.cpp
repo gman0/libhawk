@@ -17,20 +17,18 @@
 	along with libhawk.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <boost/filesystem.hpp>
-#include <boost/functional/hash.hpp>
 #include <algorithm>
 #include <utility>
 #include <exception>
 #include <chrono>
+#include <utility>
 #include "Tab.h"
 #include "Column.h"
 #include "handlers/List_dir.h"
 #include "Dir_cache.h"
 #include "Interruptible_thread.h"
 #include "Interrupt.h"
-
-using namespace boost::filesystem;
+#include "Filesystem.h"
 
 namespace hawk {
 
@@ -43,9 +41,9 @@ struct Global_guard
 	{ global.store(false, std::memory_order_release); }
 };
 
-static std::vector<path> dissect_path(path& p, int ncols)
+static std::vector<Path> dissect_path(Path& p, int ncols)
 {
-	std::vector<path> paths(ncols + 1);
+	std::vector<Path> paths(ncols + 1);
 
 	for (; ncols >= 0; ncols--)
 	{
@@ -68,26 +66,16 @@ static int get_empty_columns(const Tab::List_dir_vector& ld_vec)
 	return n;
 }
 
-// Fool-proof check for directory reading privileges.
-static bool dir_readable(const path& p)
-{
-	boost::system::error_code ec;
-	if (!is_directory(p, ec)) return false;
-
-	directory_iterator it {p, ec};
-	return !ec;
-}
-
 // Checks path for validity
-static void check_and_rollback_path(path& p, const path& old_p)
+static void check_and_rollback_path(Path& p, const Path& old_p)
 {
-	if (dir_readable(p)) return; // We're good to go.
+	if (directory_readable(p)) return; // We're good to go.
 
 	p = old_p; // Roll back to the previous path.
-	if (dir_readable(p)) return;
+	if (directory_readable(p)) return;
 
 	// Otherwise roll back to the parent directory until it's readable.
-	while (!dir_readable(p))
+	while (!directory_readable(p))
 		p = p.parent_path();
 
 	if (p.empty())
@@ -111,9 +99,9 @@ Tab::~Tab()
 	m_tasking_thread.join();
 }
 
-path Tab::get_path() const
+Path Tab::get_path() const
 {
-	path p;
+	Path p;
 
 	{
 		std::shared_lock<std::shared_timed_mutex> lk {m_path_sm};
@@ -123,7 +111,7 @@ path Tab::get_path() const
 	return m_path;
 }
 
-void Tab::task_set_path(const path& p)
+void Tab::task_set_path(const Path& p)
 {
 	Global_guard gg {m_tasking.global};
 
@@ -140,7 +128,7 @@ void Tab::task_set_path(const path& p)
 	}
 }
 
-void Tab::set_path(path p)
+void Tab::set_path(Path p)
 {
 	try { p = canonical(p, m_path); }
 	catch (...) { m_tasking.exception_handler(std::current_exception()); }
@@ -167,17 +155,19 @@ void Tab::set_cursor(Dir_cursor cursor)
 {
 	if (can_set_cursor())
 	{
-		m_columns.back()->set_cursor(cursor);
-		create_preview(cursor->path);
+		List_dir_ptr& ld = m_columns.back();
+		ld->set_cursor(cursor);
+		create_preview({ld->get_path() / cursor->path});
 	}
 }
 
-void Tab::set_cursor(const path& p)
+void Tab::set_cursor(const Path& filename)
 {
 	if (can_set_cursor())
 	{
-		m_columns.back()->set_cursor(p);
-		create_preview(p);
+		List_dir_ptr& ld = m_columns.back();
+		ld->set_cursor(filename);
+		create_preview({ld->get_path() / filename});
 	}
 }
 
@@ -201,14 +191,14 @@ void Tab::instantiate_columns(int ncols)
 
 void Tab::initialize_columns(int ncols)
 {
-	path p = m_path;
-	std::vector<path> paths = dissect_path(p, ncols);
+	Path p = m_path;
+	std::vector<Path> paths = dissect_path(p, ncols);
 
 	for (; ncols >= 0; ncols--)
 		ready_column(*m_columns[ncols], paths[ncols]);
 }
 
-void Tab::update_paths(path p)
+void Tab::update_paths(Path p)
 {
 	int ncols = m_columns.size() - 1;
 
@@ -225,7 +215,7 @@ void Tab::add_column(const Type_factory::Handler& closure)
 	m_columns.emplace_back(static_cast<List_dir*>(closure()));
 }
 
-void Tab::ready_column(Column& col, const path& p)
+void Tab::ready_column(Column& col, const Path& p)
 {
 	col.set_path(p);
 	col.ready();
@@ -234,7 +224,10 @@ void Tab::ready_column(Column& col, const path& p)
 void Tab::update_active_cursor()
 {
 	if (can_set_cursor())
-		task_create_preview(m_columns.back()->get_cursor()->path);
+	{
+		List_dir_ptr& ld = m_columns.back();
+		task_create_preview({ld->get_path() / ld->get_cursor()->path});
+	}
 }
 
 bool Tab::can_set_cursor()
@@ -243,7 +236,7 @@ bool Tab::can_set_cursor()
 	return !m_columns.back()->get_contents().empty();
 }
 
-void Tab::create_preview(const path& p)
+void Tab::create_preview(const Path& p)
 {
 	std::unique_lock<std::mutex> lk {m_tasking.m};
 	if (m_tasking.global.load(std::memory_order_acquire))
@@ -271,7 +264,7 @@ void Tab::create_preview(const path& p)
 	});
 }
 
-void Tab::task_create_preview(const path& p)
+void Tab::task_create_preview(const Path& p)
 {
 	auto handler = m_type_factory->get_handler(p);
 	if (!handler) return;

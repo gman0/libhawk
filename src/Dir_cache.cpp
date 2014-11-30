@@ -20,16 +20,15 @@
 #include <utility>
 #include <functional>
 #include <memory>
-#include <boost/filesystem.hpp>
 #include <thread>
 #include <chrono>
 #include <atomic>
 #include <mutex>
 #include <shared_mutex>
+#include <algorithm>
 #include "Dir_cache.h"
 #include "Interrupt.h"
-
-using namespace boost::filesystem;
+#include "Filesystem.h"
 
 namespace hawk {
 
@@ -37,7 +36,7 @@ struct Cache_entry
 {
 	size_t hash;
 	time_t timestamp;
-	boost::filesystem::path path;
+	Path path;
 	Dir_ptr ptr;
 };
 
@@ -109,8 +108,7 @@ public:
 	{
 		std::shared_lock<std::shared_timed_mutex> lk {m_smutex};
 
-		Node* n = m_head.load();
-		while (n)
+		for (Node* n = m_head.load(); n != nullptr; n = n->next)
 		{
 			if (n->ent.hash == path_hash
 				&& n->state.load() != Node_state::in_use_skip)
@@ -131,8 +129,6 @@ public:
 					n->state.store(Node_state::not_in_use);
 				}
 			}
-
-			n = n->next;
 		}
 
 		return nullptr;
@@ -160,28 +156,23 @@ public:
 		std::shared_lock<std::shared_timed_mutex> lk {m_smutex};
 
 		Node* free = nullptr;
-		Node* n = m_head.load();
-		while (n)
-		{
-			if (wait_for_state(n->state, Node_state::in_use_skip,
-							   Node_state::in_use_block))
-			{
-				if (!is_free(n->ent))
-					n->state.store(Node_state::not_in_use);
-				else
-				{
-					if (!free) free = n;
-					else
-					{
-						if (n->ent.ptr->capacity() > free->ent.ptr->capacity())
-						{
-							free->state.store(Node_state::not_in_use);
-							free = n;
-						}
-					}
-				}
 
-				n = n->next;
+		for (Node* n = m_head.load(); n != nullptr; n = n->next)
+		{
+			if (!wait_for_state(n->state, Node_state::in_use_skip,
+								Node_state::in_use_block))
+				continue;
+
+			if (!is_free(n->ent))
+				n->state.store(Node_state::not_in_use);
+			else
+			{
+				if (!free) free = n;
+				else if (n->ent.ptr->capacity() > free->ent.ptr->capacity())
+				{
+					free->state.store(Node_state::not_in_use);
+					free = n;
+				}
 			}
 		}
 
@@ -198,8 +189,7 @@ public:
 	{
 		std::shared_lock<std::shared_timed_mutex> lk {m_smutex};
 
-		Node* n = m_head.load();
-		while (n)
+		for (Node* n = m_head.load(); n != nullptr; n = n->next)
 		{
 			Node_state st = Node_state::not_in_use;
 			if (n->state.compare_exchange_strong(st, Node_state::in_use_skip))
@@ -209,8 +199,6 @@ public:
 
 				n->state.store(Node_state::not_in_use);
 			}
-
-			n = n->next;
 		}
 	}
 
@@ -291,28 +279,28 @@ static void sort_dir(Dir_vector& vec)
 		std::sort(vec.begin(), vec.end(), s_state.sort_pred);
 }
 
-static void populate_user_data(Dir_entry& ent)
+static void populate_user_data(const Path& base, Dir_entry& ent)
 {
 	if (s_state.populate_user_data)
 	{
 		assert(!ent.user_data.empty() && "No User_data type specified");
-		s_state.populate_user_data(ent);
+		s_state.populate_user_data({base / ent.path}, ent.user_data);
 	}
 }
 
 // Gather contents of a directory and move them to the out vector
-static void gather_dir_contents(const path& p, Dir_vector& out)
+static void gather_dir_contents(const Path& p, Dir_vector& out)
 {
-	directory_iterator dir_it_end;
-	for (auto dir_it = directory_iterator {p};
+	Directory_iterator dir_it_end;
+	for (auto dir_it = Directory_iterator {p};
 		 dir_it != dir_it_end;
 		 ++dir_it)
 	{
 		soft_interruption_point();
 
 		Dir_entry dir_ent;
-		dir_ent.path = std::move(*dir_it);
-		populate_user_data(dir_ent);
+		dir_ent.path = *dir_it;
+		populate_user_data(p, dir_ent);
 
 		soft_interruption_point();
 
@@ -333,21 +321,21 @@ static void try_update_dir_contents(Cache_entry& ent,
 		return;
 	}
 
-	boost::system::error_code ec;
-	time_t new_timestamp = last_write_time(ent.path, ec);
+	int err;
+	time_t new_timestamp = last_write_time(ent.path, err);
 
 	if (new_timestamp > ent.timestamp)
 	{
 		hash_vec.push_back(ent.hash);
 
-		if (ec)
+		if (err != 0)
 			return;
 
 		ent.ptr->clear();
 		ent.timestamp = new_timestamp;
 
 		try { gather_dir_contents(ent.path, *(ent.ptr)); }
-		catch (const filesystem_error&) {}
+		catch (const Filesystem_error&) {}
 		// Ignore any filesystem exceptions as we're
 		// going to reload_current_path later anyway.
 	}
@@ -404,7 +392,7 @@ void set_sort_predicate(Dir_sort_predicate&& pred)
 	s_state.on_sort_change();
 }
 
-static void build_cache_entry(Cache_entry& ent, const path& p,
+static void build_cache_entry(Cache_entry& ent, const Path& p,
 							  size_t path_hash,
 							  std::shared_ptr<Dir_vector>&& ptr)
 {
@@ -415,8 +403,9 @@ static void build_cache_entry(Cache_entry& ent, const path& p,
 	gather_dir_contents(p, *ent.ptr);
 }
 
-Dir_ptr get_dir_ptr(const path& p, size_t path_hash)
+Dir_ptr get_dir_ptr(const Path& p)
 {
+	size_t path_hash = p.hash();
 	Dir_ptr ptr = s_state.entries.find(path_hash);
 	if (ptr)
 		return ptr;

@@ -22,7 +22,6 @@
 
 #include <vector>
 #include <memory>
-#include <boost/filesystem/path.hpp>
 #include <utility>
 #include <condition_variable>
 #include <exception>
@@ -31,6 +30,7 @@
 #include <shared_mutex>
 #include <atomic>
 #include <chrono>
+#include "Path.h"
 #include "Type_factory.h"
 #include "Dir_cache.h"
 #include "Interruptible_thread.h"
@@ -76,7 +76,7 @@ namespace hawk {
 
 	private:
 		mutable std::shared_timed_mutex m_path_sm;
-		boost::filesystem::path m_path;
+		Path m_path;
 
 		List_dir_vector m_columns;
 		Column_ptr m_preview;
@@ -131,20 +131,20 @@ namespace hawk {
 		Tab(const Tab&) = delete;
 		Tab& operator=(const Tab&) = delete;
 
-		boost::filesystem::path get_path() const;
-		void set_path(boost::filesystem::path path);
+		Path get_path() const;
+		void set_path(Path path);
 
 		const List_dir_vector& get_columns() const;
 
 		void set_cursor(Dir_cursor cursor);
-		void set_cursor(const boost::filesystem::path& path);
+		void set_cursor(const Path& filename);
 
 	private:
 		void build_columns(int ncols);
 		void instantiate_columns(int ncols);
 		void initialize_columns(int ncols);
 
-		void update_paths(boost::filesystem::path path);
+		void update_paths(Path path);
 		void update_active_cursor();
 		// Used when calling set_cursor(). Returns true if
 		// the cursor can be safely set.
@@ -152,13 +152,13 @@ namespace hawk {
 
 		void add_column(const Type_factory::Handler& closure);
 		// Sets column's path and calls its ready().
-		void ready_column(Column& col, const boost::filesystem::path& path);
+		void ready_column(Column& col, const Path& path);
 
-		void create_preview(const boost::filesystem::path& path);
+		void create_preview(const Path& path);
 		void destroy_preview();
 
-		void task_set_path(const boost::filesystem::path& path);
-		void task_create_preview(const boost::filesystem::path& path);
+		void task_set_path(const Path& path);
+		void task_create_preview(const Path& path);
 	};
 }
 

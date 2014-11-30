@@ -23,13 +23,13 @@
 #include <memory>
 #include <utility>
 #include <vector>
-#include <boost/filesystem/path.hpp>
+#include "Path.h"
 
 namespace hawk {
 	class Column
 	{
 	protected:
-		boost::filesystem::path m_path;
+		Path m_path;
 
 		// Columns form a linked-list-like structure. This pointer
 		// is used to set cursors properly.
@@ -48,8 +48,8 @@ namespace hawk {
 		// For internal/expert use only.
 		void _set_next_column(const Column* next_column);
 
-		const boost::filesystem::path& get_path() const;
-		virtual void set_path(const boost::filesystem::path& path);
+		const Path& get_path() const;
+		virtual void set_path(const Path& path);
 
 		// This method is called internally by hawk::Tab when the
 		// path has been successfuly set and the Column is ready to
@@ -61,7 +61,7 @@ namespace hawk {
 		// Returns nullptr when m_next_column is nullptr.
 		// Otherwise pointer to path of the next column
 		// is returned.
-		const boost::filesystem::path* get_next_path() const;
+		const Path* get_next_path() const;
 	};
 }
 

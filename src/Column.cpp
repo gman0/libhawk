@@ -22,8 +22,6 @@
 #include "Column.h"
 #include "Tab.h"
 
-using namespace boost::filesystem;
-
 namespace hawk {
 
 Column::Column(Column&& col) noexcept
@@ -52,20 +50,17 @@ void Column::_set_next_column(const Column* next_column)
 	m_next_column = next_column;
 }
 
-const path& Column::get_path() const
+const Path& Column::get_path() const
 {
 	return m_path;
 }
 
-const path* Column::get_next_path() const
+const Path* Column::get_next_path() const
 {
-	if (!m_next_column)
-		return nullptr;
-	else
-		return &m_next_column->get_path();
+	return m_next_column ? &m_next_column->get_path() : nullptr;
 }
 
-void Column::set_path(const path& p)
+void Column::set_path(const Path& p)
 {
 	m_path = p;
 }

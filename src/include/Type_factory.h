@@ -24,7 +24,7 @@
 #include <functional>
 #include <vector>
 #include <utility>
-#include <boost/filesystem/path.hpp>
+#include "Path.h"
 #include "No_hash.h"
 #include "Column.h"
 
@@ -49,14 +49,14 @@ namespace hawk {
 
 		// Returns a handler for supplied hash or deduced file type.
 		Handler operator[](size_t type);
-		Handler operator[](const boost::filesystem::path& p);
+		Handler operator[](const Path& p);
 
 		// The same as for operator[]'s.
 		Handler get_handler(size_t type);
-		Handler get_handler(const boost::filesystem::path& p);
+		Handler get_handler(const Path& p);
 
-		const char* get_mime(const boost::filesystem::path& p);
-		size_t get_hash_type(const boost::filesystem::path& p);
+		const char* get_mime(const Path& p);
+		size_t get_hash_type(const Path& p);
 	};
 }
 

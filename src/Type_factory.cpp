@@ -23,8 +23,6 @@
 #include "Type_factory.h"
 #include "calchash.h"
 
-using namespace boost::filesystem;
-
 constexpr int half_size_t = sizeof(size_t) * 4;
 
 namespace hawk {
@@ -102,7 +100,7 @@ Type_factory::Handler Type_factory::operator[](size_t type)
 	return it->second;
 }
 
-Type_factory::Handler Type_factory::operator[](const path& p)
+Type_factory::Handler Type_factory::operator[](const Path& p)
 {
 	return operator[](get_hash_type(p));
 }
@@ -112,17 +110,17 @@ Type_factory::Handler Type_factory::get_handler(size_t type)
 	return operator[](type);
 }
 
-Type_factory::Handler Type_factory::get_handler(const path& p)
+Type_factory::Handler Type_factory::get_handler(const Path& p)
 {
 	return operator[](p);
 }
 
-const char* Type_factory::get_mime(const path& p)
+const char* Type_factory::get_mime(const Path& p)
 {
 	return magic_file(m_magic_guard->magic_cookie, p.c_str());
 }
 
-size_t Type_factory::get_hash_type(const path& p)
+size_t Type_factory::get_hash_type(const Path& p)
 {
 	static std::string mime;
 	const char* m = get_mime(p);

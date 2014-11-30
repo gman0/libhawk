@@ -22,14 +22,15 @@
 
 #include <memory>
 #include <functional>
-#include <boost/filesystem/path.hpp>
+#include <vector>
+#include "Path.h"
 #include "User_data.h"
 
 namespace hawk
 {
 	struct Dir_entry
 	{
-		boost::filesystem::path path;
+		Path path;
 		User_data user_data;
 	};
 
@@ -44,7 +45,7 @@ namespace hawk
 	using On_sort_change_f = std::function<void()>;
 	using Dir_sort_predicate = std::function<
 		bool(const Dir_entry&, const Dir_entry&)>;
-	using Populate_user_data = std::function<void(Dir_entry&)>;
+	using Populate_user_data = std::function<void(const Path&, User_data&)>;
 
 	// Starts a thread that checks filesystem every second and
 	// updates cache entries if needed.
@@ -54,8 +55,7 @@ namespace hawk
 
 	void set_sort_predicate(Dir_sort_predicate&& pred);
 
-	Dir_ptr get_dir_ptr(const boost::filesystem::path& p,
-						size_t path_hash);
+	Dir_ptr get_dir_ptr(const Path& p);
 
 	// Destroy nfree_ptrs free pointers.
 	void destroy_free_dir_ptrs(int nfree_ptrs);

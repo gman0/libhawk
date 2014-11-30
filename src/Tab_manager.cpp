@@ -20,12 +20,9 @@
 #include <utility>
 #include <cassert>
 #include <algorithm>
-#include <boost/filesystem.hpp>
-#include <boost/functional/hash.hpp>
 #include "Tab_manager.h"
 #include "handlers/List_dir_hash.h"
 
-using boost::filesystem::path;
 
 namespace hawk {
 
@@ -70,7 +67,7 @@ void Tab_manager::on_fs_change(const Hash_vector& hvec)
 			const auto col_it = std::find_if(
 						ld_vec.crbegin(), ld_vec.crend(),
 						[path_hash](const Tab::List_dir_ptr& col) {
-					return hash_value(col->get_path()) == path_hash;
+					return col->get_path().hash() == path_hash;
 			});
 
 			if (col_it != ld_vec.rend())

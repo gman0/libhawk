@@ -20,67 +20,21 @@
 #include <exception>
 #include <utility>
 #include <algorithm>
-
-#include <boost/functional/hash.hpp>
-// ^ this resolves an undefined reference to boost::hash_range<>
-
+#include <unistd.h>
 #include "handlers/List_dir.h"
 #include "handlers/List_dir_hash.h"
-
 #include "Tab.h"
 #include "Cursor_cache.h"
 #include "Column.h"
-
-using namespace boost::filesystem;
+#include "Filesystem.h"
 
 namespace hawk {
 
-// Checks for absolute paths.
-static Dir_cursor match_cursor_absolute(Dir_vector& vec,
-												  size_t match_hash)
+static Dir_cursor match_cursor(Dir_vector& vec, size_t hash)
 {
-	return std::find_if(vec.begin(), vec.end(),
-				[match_hash](const Dir_entry& dir_ent)
-				{ return (hash_value(dir_ent.path) == match_hash); });
-}
-
-// Checks for filenames only.
-static Dir_cursor match_cursor_filename(Dir_vector& vec, const path& filename)
-{
-	size_t hash = hash_value(filename);
-	const auto predicate =
-			[hash](const Dir_entry& ent)
-			{ return (hash_value(ent.path.filename())) == hash; };
-
-	return std::find_if(vec.begin(), vec.end(), predicate);
-}
-
-List_dir::List_dir(List_dir&& ld) noexcept
-	:
-	  Column{std::move(ld)},
-	  m_cursor_cache{ld.m_cursor_cache},
-	  m_path_hash{ld.m_path_hash},
-	  m_dir_ptr{std::move(ld.m_dir_ptr)},
-	  m_cursor{std::move(ld.m_cursor)}
-{
-	ld.m_path_hash = 0;
-	ld.m_cursor_cache = nullptr;
-}
-
-List_dir& List_dir::operator=(List_dir&& ld) noexcept
-{
-	if (this == &ld)
-		return *this;
-
-	Column::operator=(std::move(ld));
-	m_cursor_cache = ld.m_cursor_cache;
-	m_path_hash = ld.m_path_hash;
-	m_dir_ptr = std::move(ld.m_dir_ptr);
-	m_cursor = std::move(ld.m_cursor);
-
-	ld.m_cursor_cache = nullptr;
-
-	return *this;
+	return std::find_if(vec.begin(), vec.end(), [hash](const Dir_entry& ent){
+		return ent.path.hash() == hash;
+	});
 }
 
 void List_dir::acquire_cursor()
@@ -91,14 +45,13 @@ void List_dir::acquire_cursor()
 		return;
 	}
 
-	Cursor_cache::Cursor cursor_hash_it;
-
-	if (m_cursor_cache->find(m_path_hash, cursor_hash_it))
+	Cursor_cache::Cursor cursor;
+	if (m_cursor_cache->find(m_path.hash(), cursor))
 	{
 		// Ok, so we DID find the hash of the cursor,
 		// now let's assign it to the correct Dir_vector
 		// item if we can.
-		m_cursor = match_cursor_absolute(*m_dir_ptr, cursor_hash_it->second);
+		m_cursor = match_cursor(*m_dir_ptr, cursor->second);
 
 		if (m_cursor != m_dir_ptr->end())
 			return;
@@ -117,12 +70,12 @@ void List_dir::set_cursor(Dir_cursor cursor)
 	if (m_dir_ptr->empty())
 		return;
 
-	m_cursor_cache->store(m_path_hash, hash_value(m_cursor->path));
+	m_cursor_cache->store(m_path.hash(), m_cursor->path.hash());
 }
 
-void List_dir::set_cursor(const path& filename)
+void List_dir::set_cursor(const Path& filename)
 {
-	Dir_cursor cursor = match_cursor_filename(*m_dir_ptr, filename);
+	Dir_cursor cursor = match_cursor(*m_dir_ptr, filename.hash());
 
 	if (cursor != m_dir_ptr->end())
 		set_cursor(cursor);
@@ -130,15 +83,13 @@ void List_dir::set_cursor(const path& filename)
 		set_cursor(m_dir_ptr->begin());
 }
 
-bool List_dir::try_get_cursor(const boost::filesystem::path& filename,
-							  Dir_cursor& cur)
+bool List_dir::try_get_cursor(const Path& filename, Dir_cursor& cur)
 {
-	cur = match_cursor_filename(*m_dir_ptr, filename);
+	cur = match_cursor(*m_dir_ptr, filename.hash());
 	return cur != m_dir_ptr->end();
 }
 
-bool List_dir::try_get_const_cursor(const boost::filesystem::path& filename,
-									Dir_const_cursor& cur)
+bool List_dir::try_get_const_cursor(const Path& filename, Dir_const_cursor& cur)
 {
 	Dir_cursor c;
 	bool ret = try_get_cursor(filename, c);
@@ -147,29 +98,25 @@ bool List_dir::try_get_const_cursor(const boost::filesystem::path& filename,
 	return ret;
 }
 
-void List_dir::set_path(const path& dir)
+void List_dir::set_path(const Path& dir)
 {
 	if (dir.empty())
 	{
 		m_path.clear();
 		m_dir_ptr.reset();
-		m_path_hash = 0;
 
 		return;
 	}
 
-	using namespace boost::system::errc;
-
 	if (!is_directory(dir))
-		throw filesystem_error {dir.native(), make_error_code(not_a_directory)};
+		throw Filesystem_error {dir, ENOTDIR};
 
 	if (access(dir.c_str(), R_OK) == -1)
-		throw filesystem_error {dir.native(), make_error_code(permission_denied)};
+		throw Filesystem_error {dir, EPERM};
 
 	Column::set_path(dir);
 
-	m_path_hash = hash_value(dir);
-	m_dir_ptr = get_dir_ptr(dir, m_path_hash);
+	m_dir_ptr = get_dir_ptr(dir);
 	acquire_cursor();
 }
 

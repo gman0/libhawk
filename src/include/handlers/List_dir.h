@@ -24,7 +24,6 @@
 #include <string>
 #include <ctime>
 #include <utility>
-#include <boost/filesystem.hpp>
 #include "Column.h"
 #include "No_hash.h"
 #include "Dir_cache.h"
@@ -37,24 +36,16 @@ namespace hawk {
 	private:
 		Cursor_cache* m_cursor_cache;
 
-		// This will hold the hash value of current path
-		// which will be used as a key in m_cursor_cache.
-		size_t m_path_hash;
-
 	protected:
 		Dir_ptr m_dir_ptr;
 		Dir_cursor m_cursor;
 
 	public:
 		List_dir(Cursor_cache* cc)
-			:
-			  m_cursor_cache{cc},
-			  m_path_hash{0}
+			: m_cursor_cache{cc}
 		{}
 
 		List_dir(const List_dir&) = delete;
-		List_dir(List_dir&& ld) noexcept;
-		List_dir& operator=(List_dir&& ld) noexcept;
 
 		const Dir_vector& get_contents() const { return *m_dir_ptr; }
 
@@ -62,19 +53,17 @@ namespace hawk {
 		Dir_const_cursor get_const_cursor() const { return m_cursor; }
 
 		// These two methods try to find a cursor with supplied filename.
-		// (Note that by filename I mean filename by calling eg.
-		// boost::filesystem::path's filename() method.)
+		// (Note that by filename I mean filename by calling eg. Path's
+		// filename() method.)
 		// On success, the resulting cursor is stored in cur and
 		// true is returned.
-		bool try_get_cursor(const boost::filesystem::path& filename,
-							Dir_cursor& cur);
-		bool try_get_const_cursor(const boost::filesystem::path& filename,
-								  Dir_const_cursor& cur);
+		bool try_get_cursor(const Path& filename, Dir_cursor& cur);
+		bool try_get_const_cursor(const Path& filename, Dir_const_cursor& cur);
 
 		void set_cursor(Dir_cursor cursor);
-		void set_cursor(const boost::filesystem::path& filename);
+		void set_cursor(const Path& filename);
 
-		virtual void set_path(const boost::filesystem::path& path);
+		virtual void set_path(const Path& path);
 
 	private:
 		void acquire_cursor();
