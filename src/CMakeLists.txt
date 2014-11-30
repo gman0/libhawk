@@ -3,19 +3,14 @@ project(libhawk)
 
 set(CMAKE_CXX_FLAGS "-std=c++1y -Wall -pedantic -g -O0 -fPIC")
 
-set(Boost_USE_STATIC_LIBS OFF)
-set(Boost_USE_MULTITHREADED ON)
-set(Boost_USE_STATIC_RUNTIME OFF)
-find_package(Boost COMPONENTS system filesystem)
-
-include_directories("include" ${Boost_INCLUDE_DIRS})
+include_directories("include")
 
 file(GLOB_RECURSE srcs "./*.cpp")
 add_library(hawk_obj OBJECT ${srcs})
 add_library(hawk_static STATIC $<TARGET_OBJECTS:hawk_obj>)
 add_library(hawk SHARED $<TARGET_OBJECTS:hawk_obj>)
 
-target_link_libraries(hawk ${Boost_LIBRARIES} magic pthread)
+target_link_libraries(hawk magic pthread)
 
 install(TARGETS hawk hawk_static DESTINATION lib)
 install(DIRECTORY "include/" DESTINATION "include/hawk")
