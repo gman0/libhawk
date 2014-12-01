@@ -179,7 +179,10 @@ Path canonical(const Path& p, const Path& base)
 		~Buffer() { delete [] ptr; }
 	} buf;
 
-	if (realpath((base / p).c_str(), buf.ptr) == nullptr)
+	char* res = (p.is_absolute()) ? realpath(p.c_str(), buf.ptr)
+								  : realpath((base / p).c_str(), buf.ptr);
+
+	if (res == nullptr)
 		throw Filesystem_error {{base / p}, errno};
 
 	return buf.ptr;
