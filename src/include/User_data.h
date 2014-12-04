@@ -20,10 +20,11 @@
 #ifndef HAWK_USER_DATA_H
 #define HAWK_USER_DATA_H
 
-#include <type_traits>
 #include <typeinfo>
 #include <utility>
+#include <memory>
 #include <cassert>
+#include "Not_self_type.h"
 
 namespace hawk {
 
@@ -32,25 +33,30 @@ namespace hawk {
 	{
 	public:
 		User_data() : m_content{nullptr} {}
-		~User_data();
 
-		template <typename T>
+		User_data(User_data&&) = default;
+		User_data& operator=(User_data&&) = default;
+
+		// User can supply any type he wants but it has to stay
+		// the same throughout the whole application life-time,
+		// otherwise an assert will fire.
+		// The supplied type is required to be CopyConstructible
+		// and/or MoveConstructible, otherwise a static_assert
+		// will fire.
+		template <typename T, enable_if_not_self<T, User_data>* = nullptr>
 		User_data(T&& value)
 			: m_content{new Holder<typename std::decay<T>::type>{
 					std::forward<T>(value)}}
 		{}
 
-		User_data(const User_data& ud);
-		User_data(User_data&& ud) noexcept;
+		User_data(const User_data& ud) = delete;
 
-		User_data& swap(User_data& ud) noexcept;
-		User_data& operator=(const User_data& ud);
-		User_data& operator=(User_data&& rhs) noexcept;
-
-		template <typename T>
+		template <typename T, enable_if_not_self<T, User_data>* = nullptr>
 		User_data& operator=(T&& value)
 		{
-			User_data(std::forward<T>(value)).swap(*this);
+			User_data tmp = User_data {std::forward<T>(value)};
+			m_content = tmp.m_content;
+
 			return *this;
 		}
 
@@ -63,10 +69,7 @@ namespace hawk {
 		{
 		public:
 			virtual ~Placeholder() = default;
-
-		public:
 			virtual const std::type_info& type() const noexcept = 0;
-			virtual Placeholder* clone() const = 0;
 		};
 
 		template <typename T>
@@ -82,6 +85,12 @@ namespace hawk {
 							  "Type supplied to ctor of User_data::Holder is "
 							  "required to be the same as type supplied to "
 							  "User_data::Holder<>");
+
+				static_assert(std::is_copy_constructible<T>::value ||
+							  std::is_move_constructible<T>::value,
+							  "Type supplied to User_data needs to be "
+							  "CopyConstructible and/or MoveConstructible");
+
 				static const std::type_info& info = typeid(T);
 				assert(info == typeid(T) && "User_data can store only data of "
 					   "the same type");
@@ -92,31 +101,26 @@ namespace hawk {
 				return typeid(T);
 			}
 
-			virtual Placeholder* clone() const
-			{
-				return new Holder(m_held);
-			}
-
 		public:
 			T m_held;
 		};
 
-		Placeholder* m_content;
+		std::unique_ptr<Placeholder> m_content;
+
 		template <typename T>
 		friend T* user_data_cast(User_data*) noexcept;
 	};
 
-	inline void swap(User_data& lhs, User_data& rhs) noexcept
-	{
-		lhs.swap(rhs);
-	}
-
 	template <typename T>
 	T* user_data_cast(User_data* ud) noexcept
 	{
-		return (ud->type() == typeid(T))
-				? static_cast<User_data::Holder<T>*>(ud->m_content)->m_held
-				  : nullptr;
+		if (ud->type() != typeid(T))
+			return nullptr;
+
+		User_data::Holder<T>* val =
+				static_cast<User_data::Holder<T>*>(ud->m_content.get());
+
+		return &val->m_held;
 	}
 
 } // namespace hawk

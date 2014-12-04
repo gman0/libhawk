@@ -21,39 +21,6 @@
 
 namespace hawk {
 
-User_data::~User_data()
-{
-	delete m_content;
-}
-
-User_data::User_data(const User_data& ud)
-	: m_content(ud.m_content ? ud.m_content->clone() : nullptr)
-{}
-
-User_data::User_data(User_data&& ud) noexcept
-	: m_content{ud.m_content}
-{
-	ud.m_content = nullptr;
-}
-
-User_data& User_data::swap(User_data& ud) noexcept
-{
-	std::swap(m_content, ud.m_content);
-	return *this;
-}
-
-User_data& User_data::operator=(const User_data& ud)
-{
-	User_data{ud}.swap(*this);
-	return *this;
-}
-
-User_data& User_data::operator=(User_data&& rhs) noexcept
-{
-	User_data{rhs}.swap(*this);
-	return *this;
-}
-
 bool User_data::empty() const
 {
 	return !m_content;
@@ -61,7 +28,7 @@ bool User_data::empty() const
 
 void User_data::clear()
 {
-	User_data{}.swap(*this);
+	m_content.reset();
 }
 
 const std::type_info& User_data::type() const
