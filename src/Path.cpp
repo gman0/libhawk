@@ -20,8 +20,9 @@
 #include <functional>
 #include <cstdlib>
 #include <cassert>
+#include <clocale>
 #include "Path.h"
-
+#include <iostream>
 namespace hawk {
 
 void Path::clear()
@@ -83,27 +84,12 @@ const std::string& Path::string() const
 
 std::wstring Path::wstring() const
 {
-	thread_local static unsigned sz = m_path.size();
-	thread_local static struct Buffer
-	{
-		wchar_t* ptr;
-		Buffer() : ptr{new wchar_t[sz]} {}
-		~Buffer() { delete [] ptr; }
-	} buf;
+	std::mbstate_t state {};
+	const char* src = m_path.c_str();
 
-	if (sz < m_path.size())
-	{
-		sz = m_path.size();
-		delete [] buf.ptr;
-		buf.ptr = new wchar_t[sz];
-	}
-
-	size_t wsz = mbstowcs(buf.ptr, m_path.c_str(), sz) + 1;
-	assert(wsz != static_cast<size_t>(-1));
-
-	std::wstring wstr;
-	wstr.reserve(wsz);
-	wstr = buf.ptr;
+	std::wstring wstr(m_path.length() + 1, L'\0');
+	wstr.reserve(m_path.length() + 1);
+	wstr.resize(mbsrtowcs(&wstr[0], &src, m_path.length(), &state) + 1);
 
 	return wstr;
 }
