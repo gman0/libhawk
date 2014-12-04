@@ -25,6 +25,7 @@
 #include <atomic>
 #include <mutex>
 #include <shared_mutex>
+#include <future>
 #include <algorithm>
 #include "Dir_cache.h"
 #include "Interrupt.h"
@@ -273,10 +274,50 @@ static struct
 	Populate_user_data populate_user_data;
 } s_state;
 
-static void sort_dir(Dir_vector& vec)
+
+constexpr int sort_granularity = 10000;
+
+static void parallel_sort(size_t beg, size_t end, Dir_vector& vec)
+{
+	Dir_vector::iterator start_it = vec.begin();
+
+	size_t d = end - beg;
+	if (d < sort_granularity)
+		std::sort(start_it + beg, start_it + end, s_state.sort_pred);
+	else
+	{
+		const size_t sz = vec.size();
+		size_t next_beg = end;
+		size_t next_end = next_beg + sort_granularity;
+
+		if (next_end > sz)
+			next_end = sz;
+
+		auto beg_it = start_it + beg;
+		auto next_beg_it = start_it + next_beg;
+		auto next_end_it = start_it + next_end;
+
+		soft_interruption_point();
+
+		auto f = std::async(std::launch::async, parallel_sort, next_beg,
+							next_end, std::ref(vec));
+		std::sort(beg_it, start_it + end, s_state.sort_pred);
+		f.wait();
+
+		std::inplace_merge(beg_it, next_beg_it,
+						   next_end_it, s_state.sort_pred);
+	}
+}
+
+static void sort_dir(Dir_vector& v)
 {
 	if (s_state.sort_pred)
-		std::sort(vec.begin(), vec.end(), s_state.sort_pred);
+	{
+		if (v.size() < sort_granularity)
+			parallel_sort(0, v.size(), v);
+		else
+			parallel_sort(0, sort_granularity, v);
+	}
 }
 
 static void populate_user_data(const Path& base, Dir_entry& ent)
@@ -393,10 +434,9 @@ void set_sort_predicate(Dir_sort_predicate&& pred)
 }
 
 static void build_cache_entry(Cache_entry& ent, const Path& p,
-							  size_t path_hash,
 							  std::shared_ptr<Dir_vector>&& ptr)
 {
-	ent.hash = path_hash;
+	ent.hash = p.hash();
 	ent.timestamp = last_write_time(p);
 	ent.path = p;
 	ent.ptr = std::move(ptr);
@@ -416,7 +456,7 @@ Dir_ptr get_dir_ptr(const Path& p)
 		s_state.entries.free_ptrs();
 
 		Cache_list::Fn update_entry = [&](Cache_entry& e) {
-			build_cache_entry(e, p, path_hash, std::move(e.ptr));
+			build_cache_entry(e, p, std::move(e.ptr));
 			ptr = e.ptr;
 		};
 
@@ -430,7 +470,7 @@ Dir_ptr get_dir_ptr(const Path& p)
 
 	soft_interruption_point();
 
-	build_cache_entry(ent, p, path_hash, std::make_shared<Dir_vector>());
+	build_cache_entry(ent, p, std::make_shared<Dir_vector>());
 	s_state.entries.push_front(ent);
 
 	return ent.ptr;
