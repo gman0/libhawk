@@ -23,7 +23,7 @@
 #include <string>
 #include <utility>
 #include <cstddef>
-#include <type_traits>
+#include "Not_self_trait.h"
 
 namespace hawk {
 	class Path
@@ -32,21 +32,15 @@ namespace hawk {
 		std::string m_path;
 		mutable size_t m_hash;
 
-		// Modify type deduction when dealing with perfect forwarding.
-		template <typename T>
-		using enable_if_not_self =
-			typename std::enable_if<!std::is_same<
-				typename std::decay<T>::type, Path>::value>::type;
-
 	public:
 		Path() : m_hash{0} {}
 
-		template <typename Path_, enable_if_not_self<Path_>* = nullptr>
+		template <typename Path_, enable_if_not_self<Path_, Path>* = nullptr>
 		Path(Path_&& p, size_t hash = 0)
 			: m_path{std::forward<Path_>(p)}, m_hash{hash}
 		{}
 
-		template <typename Path_, enable_if_not_self<Path_>* = nullptr>
+		template <typename Path_, enable_if_not_self<Path_, Path>* = nullptr>
 		Path& operator=(Path_&& p)
 		{
 			m_path = std::forward<Path_>(p);

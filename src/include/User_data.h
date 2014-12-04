@@ -24,7 +24,7 @@
 #include <utility>
 #include <memory>
 #include <cassert>
-#include "Not_self_type.h"
+#include "Not_self_trait.h"
 
 namespace hawk {
 
