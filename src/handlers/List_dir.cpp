@@ -20,6 +20,7 @@
 #include <exception>
 #include <utility>
 #include <algorithm>
+#include <iterator>
 #include <unistd.h>
 #include "handlers/List_dir.h"
 #include "handlers/List_dir_hash.h"
@@ -30,18 +31,55 @@
 
 namespace hawk {
 
-static Dir_cursor match_cursor(Dir_vector& vec, size_t hash)
+static Dir_cursor match_cursor(Dir_vector& vec, size_t hash, Dir_cursor cur,
+							   List_dir::Cursor_search_direction dir)
 {
-	return std::find_if(vec.begin(), vec.end(), [hash](const Dir_entry& ent){
+	using Dir = List_dir::Cursor_search_direction;
+	auto pred = [hash](const Dir_entry& ent){
 		return ent.path.hash() == hash;
-	});
+	};
+
+	switch (dir)
+	{
+	case Dir::begin:
+		return std::find_if(vec.begin(), vec.end(), pred);
+	case Dir::before:
+		return (std::find_if(std::reverse_iterator<Dir_cursor>{cur},
+							 vec.rend(), pred) + 1).base();
+	case Dir::after:
+		return std::find_if(cur, vec.end(), pred);
+	default: return Dir_cursor {};
+	}
+}
+
+static List_dir::Cursor_search_direction determine_direction(
+		Dir_cursor cur, const Path& filename, const Path& base)
+{
+	Dir_entry ent;
+	ent.path = filename;
+	populate_user_data(base, ent);
+
+	return (get_sort_predicate()(ent, *cur)) ?
+				List_dir::Cursor_search_direction::before
+			  : List_dir::Cursor_search_direction::after;
+}
+
+static Dir_cursor match_directed_cursor(
+		Dir_vector& vec, size_t hash, Dir_cursor cur,
+		List_dir::Cursor_search_direction dir,
+		const Path& filename, const Path& base)
+{
+	if (dir == List_dir::Cursor_search_direction::detect)
+		dir = determine_direction(cur, filename, base);
+
+	return match_cursor(vec, hash, cur, dir);
 }
 
 void List_dir::acquire_cursor()
 {
 	if (m_next_column)
 	{
-		set_cursor(get_next_path()->filename());
+		set_cursor(get_next_path()->filename(), Cursor_search_direction::begin);
 		return;
 	}
 
@@ -51,7 +89,8 @@ void List_dir::acquire_cursor()
 		// Ok, so we DID find the hash of the cursor,
 		// now let's assign it to the correct Dir_vector
 		// item if we can.
-		m_cursor = match_cursor(*m_dir_ptr, cursor->second);
+		m_cursor = match_cursor(*m_dir_ptr, cursor->second, Dir_cursor{},
+								Cursor_search_direction::begin);
 
 		if (m_cursor != m_dir_ptr->end())
 			return;
@@ -73,9 +112,11 @@ void List_dir::set_cursor(Dir_cursor cursor)
 	m_cursor_cache->store(m_path.hash(), m_cursor->path.hash());
 }
 
-void List_dir::set_cursor(const Path& filename)
+void List_dir::set_cursor(const Path& filename, Cursor_search_direction dir)
 {
-	Dir_cursor cursor = match_cursor(*m_dir_ptr, filename.hash());
+	Dir_cursor cursor =
+			match_directed_cursor(*m_dir_ptr, filename.hash(),
+								  m_cursor, dir, filename, m_path);
 
 	if (cursor != m_dir_ptr->end())
 		set_cursor(cursor);
@@ -83,16 +124,19 @@ void List_dir::set_cursor(const Path& filename)
 		set_cursor(m_dir_ptr->begin());
 }
 
-bool List_dir::try_get_cursor(const Path& filename, Dir_cursor& cur)
+bool List_dir::try_get_cursor(const Path& filename, Dir_cursor& cur,
+							  Cursor_search_direction dir)
 {
-	cur = match_cursor(*m_dir_ptr, filename.hash());
+	cur = match_directed_cursor(*m_dir_ptr, filename.hash(),
+								m_cursor, dir, filename, m_path);
 	return cur != m_dir_ptr->end();
 }
 
-bool List_dir::try_get_const_cursor(const Path& filename, Dir_const_cursor& cur)
+bool List_dir::try_get_const_cursor(const Path& filename, Dir_const_cursor& cur,
+									Cursor_search_direction dir)
 {
 	Dir_cursor c;
-	bool ret = try_get_cursor(filename, c);
+	bool ret = try_get_cursor(filename, c, dir);
 	cur = c;
 
 	return ret;

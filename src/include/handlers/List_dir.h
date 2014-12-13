@@ -32,6 +32,16 @@ namespace hawk {
 
 	class List_dir : public Column
 	{
+	public:
+		enum class Cursor_search_direction
+		{
+			begin,	// Starts the search from the beginning.
+			before,	// Searches in entries placed before the current cursor.
+			after,	// Searches in entries placed after the current cursor.
+			detect	// Determines the direction automatically. Entries need to
+					// to be sorted otherwise it will give wrong results.
+		};
+
 	private:
 		Cursor_cache* m_cursor_cache;
 
@@ -56,11 +66,13 @@ namespace hawk {
 		// filename() method.)
 		// On success, the resulting cursor is stored in cur and
 		// true is returned.
-		bool try_get_cursor(const Path& filename, Dir_cursor& cur);
-		bool try_get_const_cursor(const Path& filename, Dir_const_cursor& cur);
+		bool try_get_cursor(const Path& filename, Dir_cursor& cur,
+							Cursor_search_direction dir);
+		bool try_get_const_cursor(const Path& filename, Dir_const_cursor& cur,
+								  Cursor_search_direction dir);
 
 		void set_cursor(Dir_cursor cursor);
-		void set_cursor(const Path& filename);
+		void set_cursor(const Path& filename, Cursor_search_direction dir);
 
 		virtual void set_path(const Path& path);
 
