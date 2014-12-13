@@ -53,7 +53,13 @@ namespace hawk
 									On_sort_change_f&& on_sort_change,
 									Populate_user_data&& populate);
 
+	// More or less for internal purposes...
+	// ent has to already contain filename of file/directory
+	// Populate_user_data functor is then supplied with {base/ent.path}
+	void populate_user_data(const Path& base, Dir_entry& ent);
+
 	void set_sort_predicate(Dir_sort_predicate&& pred);
+	Dir_sort_predicate get_sort_predicate();
 
 	Dir_ptr get_dir_ptr(const Path& p);
 

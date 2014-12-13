@@ -260,7 +260,9 @@ struct Filesystem_watchdog
 	~Filesystem_watchdog()
 	{
 		done.store(true);
-		thread.join();
+
+		if (thread.joinable())
+			thread.join();
 	}
 };
 
@@ -320,7 +322,7 @@ static void sort_dir(Dir_vector& v)
 	}
 }
 
-static void populate_user_data(const Path& base, Dir_entry& ent)
+void populate_user_data(const Path& base, Dir_entry& ent)
 {
 	if (s_state.populate_user_data)
 	{
@@ -431,6 +433,11 @@ void set_sort_predicate(Dir_sort_predicate&& pred)
 	});
 
 	s_state.on_sort_change();
+}
+
+Dir_sort_predicate get_sort_predicate()
+{
+	return s_state.sort_pred;
 }
 
 static void build_cache_entry(Cache_entry& ent, const Path& p,
