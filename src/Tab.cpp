@@ -161,13 +161,14 @@ void Tab::set_cursor(Dir_cursor cursor)
 	}
 }
 
-void Tab::set_cursor(const Path& filename)
+void Tab::set_cursor(const Path& filename,
+					 List_dir::Cursor_search_direction dir)
 {
 	if (can_set_cursor())
 	{
 		List_dir_ptr& ld = m_columns.back();
-		ld->set_cursor(filename);
-		create_preview({ld->get_path() / filename});
+		ld->set_cursor(filename, dir);
+		create_preview({ld->get_path() / ld->get_cursor()->path});
 	}
 }
 

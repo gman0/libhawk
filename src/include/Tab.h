@@ -137,7 +137,10 @@ namespace hawk {
 		const List_dir_vector& get_columns() const;
 
 		void set_cursor(Dir_cursor cursor);
-		void set_cursor(const Path& filename);
+		// See handlers/List_dir.h for Cursor_search_direction
+		void set_cursor(const Path& filename,
+				List_dir::Cursor_search_direction dir =
+					List_dir::Cursor_search_direction::begin);
 
 	private:
 		void build_columns(int ncols);
