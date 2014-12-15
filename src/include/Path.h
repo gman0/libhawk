@@ -56,8 +56,8 @@ namespace hawk {
 		void clear();
 		bool empty() const;
 
-		// Compare two paths by comparing their hashes.
-		bool operator==(const Path& p);
+		friend bool operator==(const Path& rhs, const Path& lhs);
+		friend bool operator!=(const Path& rhs, const Path& lhs);
 
 		// Concatenate two paths.
 		Path& operator/=(const Path& p);
@@ -66,8 +66,13 @@ namespace hawk {
 		const std::string& string() const;
 		std::wstring wstring() const;
 
+		// Lexicographic comparison.
 		int compare(const Path& other) const;
 		int compare(const std::wstring& other) const;
+
+		// Case-insensitive lexicographic comparison.
+		int icompare(const Path& other) const;
+		int icompare(const std::wstring& other) const;
 
 		Path parent_path() const;
 		void set_parent_path();
@@ -87,6 +92,9 @@ namespace hawk {
 
 	// Concatenate two paths.
 	Path operator/(const Path& lhs, const Path& rhs);
+	// Compare two paths by comparing their hashes.
+	bool operator==(const Path& rhs, const Path& lhs);
+	bool operator!=(const Path& rhs, const Path& lhs);
 }
 
 #endif // HAWK_PATH_H

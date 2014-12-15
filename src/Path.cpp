@@ -21,8 +21,9 @@
 #include <cstdlib>
 #include <cassert>
 #include <clocale>
+#include <cwchar>
 #include "Path.h"
-#include <iostream>
+
 namespace hawk {
 
 void Path::clear()
@@ -36,9 +37,14 @@ bool Path::empty() const
 	return m_path.empty();
 }
 
-bool Path::operator==(const Path& p)
+bool operator==(const Path& rhs, const Path& lhs)
 {
-	return hash() == const_cast<Path&>(p).hash();
+	return const_cast<Path&>(rhs).hash() == const_cast<Path&>(lhs).hash();
+}
+
+bool operator!=(const Path& rhs, const Path& lhs)
+{
+	return const_cast<Path&>(rhs).hash() != const_cast<Path&>(lhs).hash();
 }
 
 Path& Path::operator/=(const Path& p)
@@ -87,9 +93,8 @@ std::wstring Path::wstring() const
 	std::mbstate_t state {};
 	const char* src = m_path.c_str();
 
-	std::wstring wstr(m_path.length() + 1, L'\0');
-	wstr.reserve(m_path.length() + 1);
-	wstr.resize(mbsrtowcs(&wstr[0], &src, m_path.length(), &state) + 1);
+	std::wstring wstr(m_path.length(), L' ');
+	wstr.resize(mbsrtowcs(&wstr[0], &src, m_path.length(), &state));
 
 	return wstr;
 }
@@ -108,24 +113,42 @@ int Path::compare(const std::wstring& other) const
 	return lhs.compare(other);
 }
 
+int Path::icompare(const Path& other) const
+{
+	return wcscasecmp(wstring().c_str(), other.wstring().c_str());
+}
+
+int Path::icompare(const std::wstring& other) const
+{
+	return wcscasecmp(wstring().c_str(), other.c_str());
+}
+
 Path Path::parent_path() const
 {
 	auto pos = m_path.rfind('/');
 
-	if (pos == std::string::npos || pos == 1)
-		return Path();
+	if (pos == std::string::npos) return Path {};
+	if (pos == 0)
+	{
+		return (m_path[1] == '\0') ? Path {} : Path {"/"};
+	}
 
-	return Path(m_path.c_str(), --pos);
+	return Path {m_path.c_str(), --pos};
 }
 
 void Path::set_parent_path()
 {
 	auto pos = m_path.rfind('/');
 
-	if (pos == std::string::npos || pos == 1)
+	if (pos == std::string::npos)
 		m_path.clear();
 	else
-		m_path = m_path.substr(0, pos - 1);
+	{
+		if (pos == 0 && m_path[1] != '\0')
+			m_path = "/";
+		else
+			m_path = m_path.substr(0, pos - 1);
+	}
 
 	m_hash = 0;
 }
