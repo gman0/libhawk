@@ -19,12 +19,11 @@
 
 #include <cerrno>
 #include <cstring>
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <climits>
 #include <cstddef>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <unistd.h>
-
 #include "Filesystem.h"
 
 namespace hawk {
@@ -106,7 +105,56 @@ bool Directory_iterator::operator!=(const Directory_iterator& it)
 	return m_dir != it.m_dir;
 }
 
-// --- end of Directory_iterator implementation
+// end of Directory_iterator implementation
+
+Path Recursive_directory_iterator::operator*()
+{
+	return *m_iter_stack.top().second;
+}
+
+bool Recursive_directory_iterator::operator==(
+		const Recursive_directory_iterator& it)
+{
+	if (m_iter_stack.empty() && it.m_iter_stack.empty())
+		return true;
+
+	if (m_iter_stack.empty() ^ it.m_iter_stack.empty())
+		return false;
+
+	return m_iter_stack.top().second == it.m_iter_stack.top().second;
+}
+
+bool Recursive_directory_iterator::operator!=(
+		const Recursive_directory_iterator& it)
+{
+	return !operator==(it);
+}
+
+Recursive_directory_iterator::Recursive_directory_iterator(const Path& p)
+{
+	m_iter_stack.emplace(p, Directory_iterator {p});
+}
+
+Recursive_directory_iterator& Recursive_directory_iterator::operator++()
+{
+	if (m_iter_stack.empty()) return *this;
+
+	auto& current = m_iter_stack.top();
+	if (current.second == Directory_iterator {})
+	{
+		m_iter_stack.pop();
+		return *this;
+	}
+
+	Path abs_path = current.first / *current.second;
+
+	if (is_directory(abs_path))
+		m_iter_stack.emplace(abs_path, Directory_iterator {abs_path});
+
+	++current.second;
+
+	return *this;
+}
 
 bool exists(const Path& p)
 {
@@ -151,6 +199,26 @@ bool is_directory(const struct stat& st) noexcept
 	return S_ISDIR(st.st_mode);
 }
 
+bool is_regular_file(const Path& p)
+{
+	return S_ISREG(status(p).st_mode);
+}
+
+bool is_regular_file(const struct stat& st) noexcept
+{
+	return S_ISREG(st.st_mode);
+}
+
+size_t file_size(const Path& p)
+{
+	return status(p).st_size;
+}
+
+size_t file_size(const struct stat& st) noexcept
+{
+	return st.st_size;
+}
+
 time_t last_write_time(const Path& p)
 {
 	return status(p).st_ctim.tv_sec;
@@ -185,7 +253,7 @@ Path canonical(const Path& p, const Path& base)
 	if (res == nullptr)
 		throw Filesystem_error {{base / p}, errno};
 
-	return buf.ptr;
+	return Path {buf.ptr};
 }
 
 Path canonical(const Path& p, const Path& base, int& err) noexcept
