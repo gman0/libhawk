@@ -35,7 +35,6 @@ namespace hawk {
 
 struct Cache_entry
 {
-	size_t hash;
 	time_t timestamp;
 	Path path;
 	Dir_ptr ptr;
@@ -50,10 +49,10 @@ static void shrink(Dir_ptr& ptr)
 		ptr->resize(max_size);
 }
 
-static bool is_free(const Cache_entry& ent) { return ent.hash == 0; }
+static bool is_free(const Cache_entry& ent) { return ent.path.empty(); }
 static void free_ptr(Cache_entry& ent)
 {
-	ent.hash = 0;
+	ent.path.clear();
 	shrink(ent.ptr);
 	ent.ptr->clear();
 }
@@ -111,7 +110,7 @@ public:
 
 		for (Node* n = m_head.load(); n != nullptr; n = n->next)
 		{
-			if (n->ent.hash == path_hash
+			if (n->ent.path.hash() == path_hash
 				&& n->state.load() != Node_state::in_use_skip)
 			{
 				if (wait_for_state(n->state, Node_state::in_use_block,
@@ -119,7 +118,7 @@ public:
 				{
 					// 2nd check because some other thread could have
 					// modified this before setting the state to in_use_block.
-					if (n->ent.hash == path_hash)
+					if (n->ent.path.hash() == path_hash)
 					{
 						Dir_ptr ptr = n->ent.ptr;
 						n->state.store(Node_state::not_in_use);
@@ -221,6 +220,8 @@ public:
 
 					if (prev)
 						prev->next = next;
+					else
+						m_head = next;
 				}
 				else
 					prev = n;
@@ -369,7 +370,7 @@ static void try_update_dir_contents(Cache_entry& ent,
 
 	if (new_timestamp > ent.timestamp)
 	{
-		hash_vec.push_back(ent.hash);
+		hash_vec.push_back(ent.path.hash());
 
 		if (err != 0)
 			return;
@@ -443,7 +444,6 @@ Dir_sort_predicate get_sort_predicate()
 static void build_cache_entry(Cache_entry& ent, const Path& p,
 							  std::shared_ptr<Dir_vector>&& ptr)
 {
-	ent.hash = p.hash();
 	ent.timestamp = last_write_time(p);
 	ent.path = p;
 	ent.ptr = std::move(ptr);
