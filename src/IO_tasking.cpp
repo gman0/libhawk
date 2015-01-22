@@ -269,6 +269,12 @@ public:
 	bool head(Iterator& front)
 	{
 		std::unique_lock<std::mutex> lk {m_mtx};
+
+		// Calls to empty() and head() could lead to a race.
+		// We need to check for empty() again here.
+		if (m_queue.empty())
+			return false;
+
 		front = m_queue.begin();
 
 		bool flag = false;
