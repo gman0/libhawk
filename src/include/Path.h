@@ -29,18 +29,18 @@ namespace hawk {
 	class Path
 	{
 	private:
-		std::string m_path;
 		mutable size_t m_hash;
+		std::string m_path;
 
 	public:
 		Path() : m_hash{0} {}
 
-		template <typename Path_, enable_if_not_self<Path_, Path>* = nullptr>
+		template <typename Path_, typename = enable_if_not_self<Path_, Path>>
 		Path(Path_&& p, size_t hash = 0)
-			: m_path{std::forward<Path_>(p)}, m_hash{hash}
+			: m_hash{hash}, m_path{std::forward<Path_>(p)}
 		{}
 
-		template <typename Path_, enable_if_not_self<Path_, Path>* = nullptr>
+		template <typename Path_, typename = enable_if_not_self<Path_, Path>>
 		Path& operator=(Path_&& p)
 		{
 			m_path = std::forward<Path_>(p);
@@ -50,7 +50,7 @@ namespace hawk {
 		}
 
 		Path(const char* p, std::string::size_type count)
-			: m_path{p, (count + 1)}, m_hash{0}
+			: m_hash{0}, m_path{p, (count + 1)}
 		{}
 
 		void clear();

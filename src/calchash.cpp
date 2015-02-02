@@ -29,7 +29,7 @@ size_t calculate_mime_hash(std::string mime)
 	// and its specific type (ie. CATEGORY/SPECIFIC_TYPE).
 
 	constexpr int half_size_t = sizeof(size_t) * 4;
-	static char split[256];
+	char split[256];
 
 	// First, we need to check whether we even have
 	// the second (specific) part of the mime-type.

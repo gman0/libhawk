@@ -43,7 +43,7 @@ namespace hawk {
 		// The supplied type is required to be CopyConstructible
 		// and/or MoveConstructible, otherwise a static_assert
 		// will fire.
-		template <typename T, enable_if_not_self<T, User_data>* = nullptr>
+		template <typename T, typename = enable_if_not_self<T, User_data>>
 		User_data(T&& value)
 			: m_content{new Holder<typename std::decay<T>::type>{
 					std::forward<T>(value)}}
@@ -51,7 +51,7 @@ namespace hawk {
 
 		User_data(const User_data& ud) = delete;
 
-		template <typename T, enable_if_not_self<T, User_data>* = nullptr>
+		template <typename T, typename = enable_if_not_self<T, User_data>>
 		User_data& operator=(T&& value)
 		{
 			User_data tmp = User_data {std::forward<T>(value)};
