@@ -35,9 +35,21 @@ namespace hawk {
 
 struct Cache_entry
 {
+	std::atomic<bool> dirty;
 	time_t timestamp;
 	Path path;
 	Dir_ptr ptr;
+
+	Cache_entry() {}
+	Cache_entry(const Cache_entry& e)
+		: dirty{e.dirty.load()}, timestamp{e.timestamp},
+		  path{e.path}, ptr{e.ptr}
+	{}
+
+	Cache_entry(Cache_entry&& e)
+		: dirty{e.dirty.load()}, timestamp{e.timestamp},
+		  path{std::move(e.path)}, ptr{std::move(e.ptr)}
+	{}
 };
 
 // Don't waste space.
@@ -81,6 +93,24 @@ private:
 	std::shared_timed_mutex m_smutex;
 
 public:
+
+	class Node_handle
+	{
+	private:
+		Node* m_node;
+
+	public:
+		Node_handle() : m_node{nullptr} {}
+		Node_handle(Node* node) : m_node{node} {}
+		~Node_handle()
+		{
+			if (m_node)
+				m_node->state.store(Node_state::not_in_use);
+		}
+
+		Cache_entry& get() { return m_node->ent; }
+	};
+
 	Cache_list() : m_head{nullptr} {}
 	~Cache_list()
 	{
@@ -94,44 +124,42 @@ public:
 		}
 	}
 
-	void push_front(const Cache_entry& ent)
+	Dir_ptr push_front(Cache_entry&& ent)
 	{
 		std::shared_lock<std::shared_timed_mutex> lk {m_smutex};
 
-		Node* n = new Node {{Node_state::not_in_use}, nullptr, ent};
+		Node* n = new Node {{Node_state::not_in_use}, nullptr, std::move(ent)};
 		n->next = m_head.load();
 
 		while (!m_head.compare_exchange_weak(n->next, n));
+
+		return n->ent.ptr;
 	}
 
-	Dir_ptr find(size_t path_hash)
+	bool find(size_t path_hash, Node_handle& nh)
 	{
 		std::shared_lock<std::shared_timed_mutex> lk {m_smutex};
 
 		for (Node* n = m_head.load(); n != nullptr; n = n->next)
 		{
 			if (n->ent.path.hash() == path_hash
-				&& n->state.load() != Node_state::in_use_skip)
+				&& n->state.load() != Node_state::in_use_skip
+				&& wait_for_state(n->state, Node_state::in_use_block,
+								  Node_state::in_use_skip))
 			{
-				if (wait_for_state(n->state, Node_state::in_use_block,
-								   Node_state::in_use_skip))
+				// 2nd check because some other thread could have
+				// modified this before setting the state to in_use_block.
+				if (n->ent.path.hash() == path_hash)
 				{
-					// 2nd check because some other thread could have
-					// modified this before setting the state to in_use_block.
-					if (n->ent.path.hash() == path_hash)
-					{
-						Dir_ptr ptr = n->ent.ptr;
-						n->state.store(Node_state::not_in_use);
-
-						return ptr;
-					}
-
-					n->state.store(Node_state::not_in_use);
+					nh = Node_handle {n};
+					return true;
 				}
+
+				n->state.store(Node_state::not_in_use);
 			}
 		}
 
-		return nullptr;
+		return false;
 	}
 
 	void for_each(Fn f)
@@ -204,30 +232,30 @@ public:
 
 	void delete_free_ptrs(int nptrs)
 	{
-		if (--nptrs > 0)
+		if (--nptrs <= 0)
+			return;
+
+		std::lock_guard<std::shared_timed_mutex> lk {m_smutex};
+
+		Node* prev = nullptr;
+		Node* n = m_head.load();
+		while (n && nptrs >= 0)
 		{
-			std::lock_guard<std::shared_timed_mutex> lk {m_smutex};
+			Node* next = n->next;
 
-			Node* prev = nullptr;
-			Node* n = m_head.load();
-			while (n && nptrs >= 0)
+			if (is_free(n->ent))
 			{
-				Node* next = n->next;
+				delete n;
 
-				if (is_free(n->ent))
-				{
-					delete n;
-
-					if (prev)
-						prev->next = next;
-					else
-						m_head = next;
-				}
+				if (prev)
+					prev->next = next;
 				else
-					prev = n;
-
-				n = next;
+					m_head = next;
 			}
+			else
+				prev = n;
+
+			n = next;
 		}
 	}
 
@@ -354,8 +382,8 @@ static void gather_dir_contents(const Path& p, Dir_vector& out)
 	sort_dir(out);
 }
 
-static void try_update_dir_contents(Cache_entry& ent,
-									std::vector<size_t>& hash_vec)
+// Marks a Dir_ptr as dirty if its timestamp is outdated.
+static void mark_ptr_dirty(Cache_entry& ent, std::vector<size_t>& hash_vec)
 {
 	if (!exists(ent.path))
 	{
@@ -370,18 +398,8 @@ static void try_update_dir_contents(Cache_entry& ent,
 
 	if (new_timestamp > ent.timestamp)
 	{
+		ent.dirty.store(true, std::memory_order_release);
 		hash_vec.push_back(ent.path.hash());
-
-		if (err != 0)
-			return;
-
-		ent.ptr->clear();
-		ent.timestamp = new_timestamp;
-
-		try { gather_dir_contents(ent.path, *(ent.ptr)); }
-		catch (const Filesystem_error&) {}
-		// Ignore any filesystem exceptions as we're
-		// going to reload_current_path later anyway.
 	}
 }
 
@@ -392,7 +410,7 @@ static void fs_watchdog()
 	while (!s_state.fs_watchdog.done)
 	{
 		s_state.entries.for_each([&hash_vec](Cache_entry& ent) {
-			try_update_dir_contents(ent, hash_vec);
+			mark_ptr_dirty(ent, hash_vec);
 		});
 
 		if (!hash_vec.empty())
@@ -444,43 +462,55 @@ Dir_sort_predicate get_sort_predicate()
 static void build_cache_entry(Cache_entry& ent, const Path& p,
 							  std::shared_ptr<Dir_vector>&& ptr)
 {
+	ent.dirty = false;
 	ent.timestamp = last_write_time(p);
 	ent.path = p;
 	ent.ptr = std::move(ptr);
+
 	gather_dir_contents(p, *ent.ptr);
+}
+
+static void rebuild_cache_entry(Cache_entry& ent)
+{
+	ent.dirty = false;
+	ent.timestamp = last_write_time(ent.path);
+	ent.ptr->clear();
+
+	gather_dir_contents(ent.path, *ent.ptr);
 }
 
 Dir_ptr get_dir_ptr(const Path& p)
 {
-	size_t path_hash = p.hash();
-	Dir_ptr ptr = s_state.entries.find(path_hash);
-	if (ptr)
-		return ptr;
-	else
 	{
-		soft_interruption_point();
+		Cache_list::Node_handle nh;
+		if (s_state.entries.find(p.hash(), nh))
+		{
+			Cache_entry& ent = nh.get();
+			if (ent.dirty.load(std::memory_order_acquire))
+				rebuild_cache_entry(ent);
 
-		s_state.entries.free_ptrs();
+			return ent.ptr;
+		}
+		else
+		{
+			s_state.entries.free_ptrs();
+			soft_interruption_point();
 
-		Cache_list::Fn update_entry = [&](Cache_entry& e) {
-			build_cache_entry(e, p, std::move(e.ptr));
-			ptr = e.ptr;
-		};
+			Dir_ptr ptr;
+			Cache_list::Fn update_entry = [&](Cache_entry& e) {
+				build_cache_entry(e, p, std::move(e.ptr));
+				ptr = e.ptr;
+			};
 
-		soft_interruption_point();
-
-		if (s_state.entries.try_reclaim_free_ptr(update_entry))
-			return ptr;
+			if (s_state.entries.try_reclaim_free_ptr(update_entry))
+				return ptr;
+		}
 	}
 
 	Cache_entry ent;
-
-	soft_interruption_point();
-
 	build_cache_entry(ent, p, std::make_shared<Dir_vector>());
-	s_state.entries.push_front(ent);
 
-	return ent.ptr;
+	return s_state.entries.push_front(std::move(ent));
 }
 
 void destroy_free_dir_ptrs(int free_ptrs)

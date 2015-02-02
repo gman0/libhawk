@@ -34,6 +34,10 @@ namespace hawk
 		User_data user_data;
 	};
 
+	// Note: existing Dir_ptr's and their Dir_cursor's (Dir_vector
+	// iterators) may become invalid after calling On_fs_change.
+	// It is advised to not keep Dir_ptr's without calling get_dir_ptr
+	// afterwards.
 	using Dir_vector = std::vector<Dir_entry>;
 	using Dir_cursor = Dir_vector::iterator;
 	using Dir_const_cursor = Dir_vector::const_iterator;
