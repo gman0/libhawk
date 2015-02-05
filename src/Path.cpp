@@ -37,6 +37,11 @@ bool Path::empty() const
 	return m_path.empty();
 }
 
+std::string::size_type Path::length() const
+{
+	return m_path.length();
+}
+
 bool operator==(const Path& rhs, const Path& lhs)
 {
 	return const_cast<Path&>(rhs).hash() == const_cast<Path&>(lhs).hash();

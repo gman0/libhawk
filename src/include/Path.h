@@ -56,6 +56,8 @@ namespace hawk {
 		void clear();
 		bool empty() const;
 
+		std::string::size_type length() const;
+
 		friend bool operator==(const Path& rhs, const Path& lhs);
 		friend bool operator!=(const Path& rhs, const Path& lhs);
 
