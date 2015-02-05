@@ -90,30 +90,30 @@ Directory_iterator& Directory_iterator::operator++()
 	return *this;
 }
 
-Path Directory_iterator::operator*()
+Path Directory_iterator::operator*() const
 {
 	return (m_dir) ? Path{m_dir->ent->d_name} : Path{};
 }
 
-bool Directory_iterator::operator==(const Directory_iterator& it)
+bool Directory_iterator::operator==(const Directory_iterator& it) const
 {
 	return m_dir == it.m_dir;
 }
 
-bool Directory_iterator::operator!=(const Directory_iterator& it)
+bool Directory_iterator::operator!=(const Directory_iterator& it) const
 {
 	return m_dir != it.m_dir;
 }
 
-// end of Directory_iterator implementation
+/// end of Directory_iterator implementation
 
-Path Recursive_directory_iterator::operator*()
+Path Recursive_directory_iterator::operator*() const
 {
 	return *m_iter_stack.top().second;
 }
 
 bool Recursive_directory_iterator::operator==(
-		const Recursive_directory_iterator& it)
+		const Recursive_directory_iterator& it) const
 {
 	if (m_iter_stack.empty() && it.m_iter_stack.empty())
 		return true;
@@ -125,7 +125,7 @@ bool Recursive_directory_iterator::operator==(
 }
 
 bool Recursive_directory_iterator::operator!=(
-		const Recursive_directory_iterator& it)
+		const Recursive_directory_iterator& it) const
 {
 	return !operator==(it);
 }
@@ -139,22 +139,29 @@ Recursive_directory_iterator& Recursive_directory_iterator::operator++()
 {
 	if (m_iter_stack.empty()) return *this;
 
-	auto& current = m_iter_stack.top();
-	if (current.second == Directory_iterator {})
+	auto& top = m_iter_stack.top();
+	Path parent_path =  top.first / *top.second;
+
+	if (is_directory(parent_path))
+		m_iter_stack.emplace(parent_path, Directory_iterator {parent_path});
+	else
+		increment();
+
+	// Resolve empty directories.
+	static const Directory_iterator end;
+	while (m_iter_stack.top().second == end)
 	{
 		m_iter_stack.pop();
-		return *this;
+		if (m_iter_stack.empty()) break;
+		increment();
 	}
-
-	Path abs_path = current.first / *current.second;
-
-	if (is_directory(abs_path))
-		m_iter_stack.emplace(abs_path, Directory_iterator {abs_path});
-
-	++current.second;
 
 	return *this;
 }
+
+/// end of Recursive_directory_iterator implementation
+
+// query functions
 
 bool exists(const Path& p)
 {
@@ -175,6 +182,8 @@ struct stat status(const Path& p, int& err) noexcept
 	struct stat st;
 	if (stat(p.c_str(), &st) == -1)
 		err = errno;
+	else
+		err = 0;
 
 	return st;
 }
@@ -235,7 +244,7 @@ time_t last_write_time(const Path& p, int& err) noexcept
 
 	err = 0;
 
-	return st.st_ctim.tv_sec;
+	return st.st_mtim.tv_sec;
 }
 
 Path canonical(const Path& p, const Path& base)
@@ -271,7 +280,76 @@ Path canonical(const Path& p, const Path& base, int& err) noexcept
 		return Path {};
 	}
 
+	err = 0;
+
 	return Path {buf.ptr};
+}
+
+Space_info space(const Path& p)
+{
+	// statvfs
+	return {0, 0, 0};
+}
+
+// operational functions
+
+void create_directory(const Path& p)
+{
+	if (mkdir(p.c_str(), 0777) == -1)
+		throw Filesystem_error {p, errno};
+}
+
+void create_directory(const Path& p, int& err) noexcept
+{
+	if (mkdir(p.c_str(), 0777) == -1)
+	{
+		err = errno;
+		return;
+	}
+
+	err = 0;
+}
+
+void create_directories(const Path& p)
+{
+	char str[PATH_MAX];
+	char* s = str + 1; // +1: Assuming p is an asbolute path.
+	strcpy(str, p.c_str());
+
+	while ((s = strchr(str, '/')))
+	{
+		*s = '\0';
+
+		if (mkdir(str, 0777) == -1 && errno != EEXIST)
+			throw Filesystem_error {str, errno};
+
+		*s = '/';
+		s++;
+	}
+}
+
+void create_directories(const Path& p, int& err) noexcept
+{
+	char str[PATH_MAX];
+	char* s = str + 1; // +1: Assuming p is an asbolute path.
+	strcpy(str, p.c_str());
+
+	while ((s = strchr(str, '/')))
+	{
+		*s = '\0';
+
+		if (mkdir(str, 0777) == -1 && errno != EEXIST)
+		{
+			err = errno;
+			return;
+		}
+
+
+		*s = '/';
+		s++;
+	}
+
+	err = 0;
 }
 
 } // namespace hawk

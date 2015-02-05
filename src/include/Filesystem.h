@@ -47,13 +47,13 @@ namespace hawk {
 		std::shared_ptr<Dir_guard> m_dir;
 
 	public:
-		Directory_iterator() {}
+		constexpr Directory_iterator() {}
 		explicit Directory_iterator(const Path& p);
 
-		Path operator*();
+		Path operator*() const;
 
-		bool operator==(const Directory_iterator& it);
-		bool operator!=(const Directory_iterator& it);
+		bool operator==(const Directory_iterator& it) const;
+		bool operator!=(const Directory_iterator& it) const;
 
 		Directory_iterator& operator++();
 	};
@@ -67,12 +67,15 @@ namespace hawk {
 		Recursive_directory_iterator() {}
 		explicit Recursive_directory_iterator(const Path& p);
 
-		Path operator*();
+		Path operator*() const;
 
-		bool operator==(const Recursive_directory_iterator& it);
-		bool operator!=(const Recursive_directory_iterator& it);
+		bool operator==(const Recursive_directory_iterator& it) const;
+		bool operator!=(const Recursive_directory_iterator& it) const;
 
 		Recursive_directory_iterator& operator++();
+
+	private:
+		inline void increment() { ++m_iter_stack.top().second; }
 	};
 
 	class Filesystem_error : public std::exception
@@ -107,6 +110,13 @@ namespace hawk {
 
 	// query functions
 
+	struct Space_info
+	{
+		uintmax_t capacity;
+		uintmax_t free;
+		uintmax_t available;
+	};
+
 	bool exists(const Path& p);
 
 	struct stat status(const Path& p);
@@ -129,6 +139,16 @@ namespace hawk {
 
 	Path canonical(const Path& p, const Path& base);
 	Path canonical(const Path& p, const Path& base, int& err) noexcept;
+
+	Space_info space(const Path& p);
+	Space_info space(const Path& p, int& err) noexcept;
+
+	// operational functions
+
+	void create_directory(const Path& p);
+	void create_directory(const Path& p, int& err) noexcept;
+	void create_directories(const Path& p);
+	void create_directories(const Path& p, int& err) noexcept;
 }
 
 #endif // HAWK_FILESYSTEM_H
