@@ -23,6 +23,7 @@
 #include <cstddef>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/statvfs.h>
 #include <unistd.h>
 #include "Filesystem.h"
 
@@ -90,6 +91,12 @@ Directory_iterator& Directory_iterator::operator++()
 	return *this;
 }
 
+void Directory_iterator::advance(const Directory_iterator& target)
+{
+	while (*this != target || !m_dir)
+		operator++();
+}
+
 Path Directory_iterator::operator*() const
 {
 	return (m_dir) ? Path{m_dir->ent->d_name} : Path{};
@@ -97,19 +104,41 @@ Path Directory_iterator::operator*() const
 
 bool Directory_iterator::operator==(const Directory_iterator& it) const
 {
-	return m_dir == it.m_dir;
+	if (!m_dir && !it.m_dir) return true;
+	if (!m_dir ^ !static_cast<bool>(it.m_dir)) return false;
+
+	return m_dir->ent->d_ino == it.m_dir->ent->d_ino;
 }
 
 bool Directory_iterator::operator!=(const Directory_iterator& it) const
 {
-	return m_dir != it.m_dir;
+	return !operator==(it);
+}
+
+bool Directory_iterator::at_end() const
+{
+	return !m_dir;
 }
 
 /// end of Directory_iterator implementation
 
 Path Recursive_directory_iterator::operator*() const
 {
-	return *m_iter_stack.top().second;
+	Path p;
+	for (const auto& leaf : m_iter_stack)
+		p /= *leaf.second;
+
+	return p;
+}
+
+Path Recursive_directory_iterator::top() const
+{
+	return *m_iter_stack.back().second;
+}
+
+int Recursive_directory_iterator::level() const
+{
+	return m_iter_stack.size() - 1;
 }
 
 bool Recursive_directory_iterator::operator==(
@@ -121,7 +150,7 @@ bool Recursive_directory_iterator::operator==(
 	if (m_iter_stack.empty() ^ it.m_iter_stack.empty())
 		return false;
 
-	return m_iter_stack.top().second == it.m_iter_stack.top().second;
+	return m_iter_stack.back().second == it.m_iter_stack.back().second;
 }
 
 bool Recursive_directory_iterator::operator!=(
@@ -130,33 +159,66 @@ bool Recursive_directory_iterator::operator!=(
 	return !operator==(it);
 }
 
+bool Recursive_directory_iterator::at_end() const
+{
+	return m_iter_stack.empty();
+}
+
 Recursive_directory_iterator::Recursive_directory_iterator(const Path& p)
 {
-	m_iter_stack.emplace(p, Directory_iterator {p});
+	m_iter_stack.emplace_back(p, Directory_iterator {p});
+}
+
+void Recursive_directory_iterator::leave_directory()
+{
+	if (!m_iter_stack.empty())
+		m_iter_stack.pop_back();
 }
 
 Recursive_directory_iterator& Recursive_directory_iterator::operator++()
 {
 	if (m_iter_stack.empty()) return *this;
 
-	auto& top = m_iter_stack.top();
-	Path parent_path =  top.first / *top.second;
+	auto& back = m_iter_stack.back();
+	Path parent_path =  back.first / *back.second;
 
 	if (is_directory(parent_path))
-		m_iter_stack.emplace(parent_path, Directory_iterator {parent_path});
+		m_iter_stack.emplace_back(parent_path, Directory_iterator {parent_path});
 	else
 		increment();
 
-	// Resolve empty directories.
-	static const Directory_iterator end;
-	while (m_iter_stack.top().second == end)
+	resolve_empty_directories();
+
+	return *this;
+}
+
+Recursive_directory_iterator&
+Recursive_directory_iterator::orthogonal_increment()
+{
+	if (!m_iter_stack.empty())
 	{
-		m_iter_stack.pop();
-		if (m_iter_stack.empty()) break;
 		increment();
+		resolve_empty_directories();
 	}
 
 	return *this;
+}
+
+void Recursive_directory_iterator::advance(
+		const Recursive_directory_iterator& target)
+{
+	while (operator!=(target) || m_iter_stack.back().second.at_end())
+		operator++();
+}
+
+void Recursive_directory_iterator::resolve_empty_directories()
+{
+	while (m_iter_stack.back().second.at_end())
+	{
+		m_iter_stack.pop_back();
+		if (m_iter_stack.empty()) break;
+		increment();
+	}
 }
 
 /// end of Recursive_directory_iterator implementation
@@ -168,19 +230,19 @@ bool exists(const Path& p)
 	return access(p.c_str(), F_OK) == 0;
 }
 
-struct stat status(const Path& p)
+Stat status(const Path& p)
 {
-	struct stat st;
-	if (stat(p.c_str(), &st) == -1)
+	Stat st;
+	if (lstat64(p.c_str(), &st) == -1)
 		throw Filesystem_error {p, errno};
 
 	return st;
 }
 
-struct stat status(const Path& p, int& err) noexcept
+Stat status(const Path& p, int& err) noexcept
 {
-	struct stat st;
-	if (stat(p.c_str(), &st) == -1)
+	Stat st;
+	if (lstat64(p.c_str(), &st) == -1)
 		err = errno;
 	else
 		err = 0;
@@ -193,9 +255,19 @@ bool is_readable(const Path& p) noexcept
 	return access(p.c_str(), R_OK) == 0;
 }
 
-bool is_readable(const struct stat& st) noexcept
+bool is_readable(const Stat& st) noexcept
 {
 	return st.st_mode & S_IREAD;
+}
+
+bool is_writable(const Path& p) noexcept
+{
+	return access(p.c_str(), W_OK) == 0;
+}
+
+bool is_writable(const Stat& st) noexcept
+{
+	return st.st_mode & S_IWRITE;
 }
 
 bool is_directory(const Path& p)
@@ -203,7 +275,7 @@ bool is_directory(const Path& p)
 	return S_ISDIR(status(p).st_mode);
 }
 
-bool is_directory(const struct stat& st) noexcept
+bool is_directory(const Stat& st) noexcept
 {
 	return S_ISDIR(st.st_mode);
 }
@@ -213,17 +285,27 @@ bool is_regular_file(const Path& p)
 	return S_ISREG(status(p).st_mode);
 }
 
-bool is_regular_file(const struct stat& st) noexcept
+bool is_regular_file(const Stat& st) noexcept
 {
 	return S_ISREG(st.st_mode);
 }
 
-size_t file_size(const Path& p)
+bool is_symlink(const Path& p)
+{
+	return S_ISLNK(status(p).st_mode);
+}
+
+bool is_symlink(const Stat& st) noexcept
+{
+	return S_ISLNK(st.st_mode);
+}
+
+uintmax_t file_size(const Path& p)
 {
 	return status(p).st_size;
 }
 
-size_t file_size(const struct stat& st) noexcept
+uintmax_t file_size(const Stat& st) noexcept
 {
 	return st.st_size;
 }
@@ -235,8 +317,8 @@ time_t last_write_time(const Path& p)
 
 time_t last_write_time(const Path& p, int& err) noexcept
 {
-	struct stat st;
-	if (stat(p.c_str(), &st) == -1)
+	Stat st;
+	if (stat64(p.c_str(), &st) == -1)
 	{
 		err = errno;
 		return -1;
@@ -287,8 +369,13 @@ Path canonical(const Path& p, const Path& base, int& err) noexcept
 
 Space_info space(const Path& p)
 {
-	// statvfs
-	return {0, 0, 0};
+	struct statvfs64 stvfs;
+	if (statvfs64(p.c_str(), &stvfs) != 0)
+		throw Filesystem_error {p, errno};
+
+	return { stvfs.f_blocks * stvfs.f_frsize,
+			 stvfs.f_bfree  * stvfs.f_frsize,
+			 stvfs.f_bavail * stvfs.f_frsize };
 }
 
 // operational functions
@@ -350,6 +437,51 @@ void create_directories(const Path& p, int& err) noexcept
 	}
 
 	err = 0;
+}
+
+void create_symlink(const Path& target, const Path& linkpath)
+{
+	if (symlink(target.c_str(), linkpath.c_str()) != 0)
+		throw Filesystem_error {linkpath, errno};
+}
+
+void create_symlink(const Path& target,
+					const Path& linkpath, int& err) noexcept
+{
+	if (symlink(target.c_str(), linkpath.c_str()) != 0)
+		err = errno;
+	else
+		err = 0;
+}
+
+int read_permissions(const Path& p)
+{
+	return status(p).st_mode;
+}
+
+int read_permissions(const Stat& st) noexcept
+{
+	return st.st_mode;
+}
+
+void write_permissions(const Path& p, mode_t perms)
+{
+	if (chmod(p.c_str(), perms) != 0)
+		throw Filesystem_error {p, errno};
+}
+
+void write_permissions(const Path& p, mode_t perms, int& err) noexcept
+{
+	if (chmod(p.c_str(), perms) != 0)
+		err = errno;
+	else
+		err = 0;
+}
+
+void copy_permissions(const Path& from, const Path& to)
+{
+	if (chmod(to.c_str(), status(from).st_mode) != 0)
+		throw Filesystem_error {to, errno};
 }
 
 } // namespace hawk

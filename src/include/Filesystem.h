@@ -24,17 +24,21 @@
 #include <memory>
 #include <stdexcept>
 #include <cstring>
-#include <stack>
+#include <deque>
 #include <dirent.h>
 #include <sys/stat.h>
 #include "Path.h"
 
 namespace hawk {
+	class Recursive_directory_iterator;
 	class Directory_iterator
 	{
 	public:
 		using value_type = Path;
 		using iterator_category = std::forward_iterator_tag;
+		using difference_type = int;
+		using pointer = Path*;
+		using reference = Path&;
 
 	private:
 		struct Dir_guard
@@ -46,6 +50,8 @@ namespace hawk {
 
 		std::shared_ptr<Dir_guard> m_dir;
 
+		friend class Recursive_directory_iterator;
+
 	public:
 		constexpr Directory_iterator() {}
 		explicit Directory_iterator(const Path& p);
@@ -55,27 +61,60 @@ namespace hawk {
 		bool operator==(const Directory_iterator& it) const;
 		bool operator!=(const Directory_iterator& it) const;
 
+		// Returns true if there are no more items to iterate.
+		bool at_end() const;
+
 		Directory_iterator& operator++();
+
+		// Advances this iterator until it either reaches
+		// target or becomes null.
+		void advance(const Directory_iterator& target);
 	};
 
 	class Recursive_directory_iterator
 	{
+	public:
+		using value_type = Directory_iterator::value_type;
+		using iterator_category = Directory_iterator::iterator_category;
+		using difference_type = Directory_iterator::difference_type;
+		using pointer = Directory_iterator::pointer;
+		using reference = Directory_iterator::reference;
+
 	private:
-		std::stack<std::pair<Path, Directory_iterator>> m_iter_stack;
+		std::deque<std::pair<Path, Directory_iterator>> m_iter_stack;
 
 	public:
 		Recursive_directory_iterator() {}
 		explicit Recursive_directory_iterator(const Path& p);
 
+		// Returns path relative to the top directory.
 		Path operator*() const;
+		// Returns only the filename.
+		Path top() const;
 
 		bool operator==(const Recursive_directory_iterator& it) const;
 		bool operator!=(const Recursive_directory_iterator& it) const;
 
+		// Returns true if there are no more items to iterate.
+		bool at_end() const;
+
+		// Returns the level of recursion. Zero means we're
+		// in the top directory.
+		int level() const;
+
+		void leave_directory();
+
 		Recursive_directory_iterator& operator++();
+		// Increment without entering a sub-directory.
+		Recursive_directory_iterator& orthogonal_increment();
+
+		// Advances this iterator until it either reaches
+		// target or becomes null.
+		void advance(const Recursive_directory_iterator& target);
 
 	private:
-		inline void increment() { ++m_iter_stack.top().second; }
+		inline void increment() { ++m_iter_stack.back().second; }
+		void resolve_empty_directories();
 	};
 
 	class Filesystem_error : public std::exception
@@ -110,6 +149,8 @@ namespace hawk {
 
 	// query functions
 
+	using Stat = struct stat64;
+
 	struct Space_info
 	{
 		uintmax_t capacity;
@@ -119,23 +160,32 @@ namespace hawk {
 
 	bool exists(const Path& p);
 
-	struct stat status(const Path& p);
-	struct stat status(const Path& p, int& err) noexcept;
+	Stat status(const Path& p);
+	Stat status(const Path& p, int& err) noexcept;
 
 	bool is_readable(const Path& p) noexcept;
-	bool is_readable(const struct stat& st) noexcept;
+	bool is_readable(const Stat& st) noexcept;
+
+	bool is_writable(const Path& p) noexcept;
+	bool is_writable(const Stat& st) noexcept;
 
 	bool is_directory(const Path& p);
-	bool is_directory(const struct stat& st) noexcept;
+	bool is_directory(const Stat& st) noexcept;
 
 	bool is_regular_file(const Path& p);
-	bool is_regular_file(const struct stat& st) noexcept;
+	bool is_regular_file(const Stat& st) noexcept;
 
-	size_t file_size(const Path& p);
-	size_t file_size(const struct stat& st) noexcept;
+	bool is_symlink(const Path& p);
+	bool is_symlink(const Stat& st) noexcept;
+
+	uintmax_t file_size(const Path& p);
+	uintmax_t file_size(const Stat& st) noexcept;
 
 	time_t last_write_time(const Path& p);
 	time_t last_write_time(const Path& p, int& err) noexcept;
+
+	int read_permissions(const Path& p);
+	int read_permissions(const Stat& st) noexcept;
 
 	Path canonical(const Path& p, const Path& base);
 	Path canonical(const Path& p, const Path& base, int& err) noexcept;
@@ -145,10 +195,19 @@ namespace hawk {
 
 	// operational functions
 
+	void write_permissions(const Path& p, mode_t perms);
+	void write_permissions(const Path& p, mode_t perms, int& err) noexcept;
+
+	void copy_permissions(const Path& from, const Path& to);
+
 	void create_directory(const Path& p);
 	void create_directory(const Path& p, int& err) noexcept;
 	void create_directories(const Path& p);
 	void create_directories(const Path& p, int& err) noexcept;
+
+	void create_symlink(const Path& target, const Path& linkpath);
+	void create_symlink(const Path& target, const Path& linkpath,
+						int& err) noexcept;
 }
 
 #endif // HAWK_FILESYSTEM_H
