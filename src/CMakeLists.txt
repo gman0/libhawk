@@ -1,7 +1,8 @@
 cmake_minimum_required(VERSION 2.8)
 project(libhawk)
 
-set(CMAKE_CXX_FLAGS "-std=c++1y -Wall -pedantic -g -O0 -fPIC")
+set(CMAKE_CXX_FLAGS "-std=c++1y -Wall -pedantic -g -O0 -fPIC \
+	 -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE")
 
 include_directories("include")
 
