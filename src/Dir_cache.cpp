@@ -62,6 +62,7 @@ static void shrink(Dir_ptr& ptr)
 }
 
 static bool is_free(const Cache_entry& ent) { return ent.path.empty(); }
+
 static void free_ptr(Cache_entry& ent)
 {
 	ent.path.clear();
@@ -222,7 +223,7 @@ public:
 			Node_state st = Node_state::not_in_use;
 			if (n->state.compare_exchange_strong(st, Node_state::in_use_skip))
 			{
-				if (n->ent.ptr.use_count() == 1)
+				if (n->ent.ptr.unique())
 					free_ptr(n->ent);
 
 				n->state.store(Node_state::not_in_use);
@@ -246,11 +247,10 @@ public:
 			if (is_free(n->ent))
 			{
 				delete n;
+				nptrs--;
 
-				if (prev)
-					prev->next = next;
-				else
-					m_head = next;
+				if (prev) prev->next = next;
+				else m_head = next;
 			}
 			else
 				prev = n;
@@ -263,19 +263,15 @@ private:
 	bool wait_for_state(std::atomic<Node_state>& state, Node_state desired,
 						Node_state fail)
 	{
-		bool cont = true;
 		Node_state st = Node_state::not_in_use;
 		while (!state.compare_exchange_weak(st, desired)
 			   && st != Node_state::not_in_use)
 		{
 			if (st == fail)
-			{
-				cont = false;
-				break;
-			}
+				return false;
 		}
 
-		return cont;
+		return true;
 	}
 };
 
@@ -283,7 +279,7 @@ struct Filesystem_watchdog
 {
 	std::thread thread;
 	std::atomic<bool> done;
-	On_fs_change_f on_change;
+	On_fs_change on_change;
 
 	Filesystem_watchdog() : done{false} {}
 	~Filesystem_watchdog()
@@ -300,7 +296,7 @@ static struct
 	Cache_list entries;
 	Filesystem_watchdog fs_watchdog;
 
-	On_sort_change_f on_sort_change;
+	On_sort_change on_sort_change;
 	Dir_sort_predicate sort_pred;
 	Populate_user_data populate_user_data;
 } s_state;
@@ -374,8 +370,6 @@ static void gather_dir_contents(const Path& p, Dir_vector& out)
 		dir_ent.path = *dir_it;
 		populate_user_data(p, dir_ent);
 
-		soft_interruption_point();
-
 		out.push_back(std::move(dir_ent));
 	}
 
@@ -383,11 +377,12 @@ static void gather_dir_contents(const Path& p, Dir_vector& out)
 }
 
 // Marks a Dir_ptr as dirty if its timestamp is outdated.
-static void mark_ptr_dirty(Cache_entry& ent, std::vector<size_t>& hash_vec)
+static void mark_outdated_ptr_dirty(Cache_entry& ent,
+									std::vector<size_t>& hash_vec)
 {
 	if (!exists(ent.path))
 	{
-		if (ent.ptr.use_count() == 1)
+		if (ent.ptr.unique())
 			free_ptr(ent);
 
 		return;
@@ -410,7 +405,7 @@ static void fs_watchdog()
 	while (!s_state.fs_watchdog.done)
 	{
 		s_state.entries.for_each([&hash_vec](Cache_entry& ent) {
-			mark_ptr_dirty(ent, hash_vec);
+			mark_outdated_ptr_dirty(ent, hash_vec);
 		});
 
 		if (!hash_vec.empty())
@@ -428,13 +423,13 @@ static void fs_watchdog()
 	}
 }
 
-void _start_filesystem_watchdog(On_fs_change_f&& on_fs_change,
-							   On_sort_change_f&& on_sort_change,
+void _start_filesystem_watchdog(On_fs_change&& on_fs_change,
+							   On_sort_change&& on_sort_change,
 							   Populate_user_data&& populate)
 {
 	static bool call_once = false;
 	if (!call_once) call_once = true;
-	else assert("_start_filesystem_watchdog can be called only once!");
+	else assert(0 && "_start_filesystem_watchdog can be called only once!");
 
 
 	s_state.fs_watchdog.on_change = std::move(on_fs_change);
@@ -479,38 +474,39 @@ static void rebuild_cache_entry(Cache_entry& ent)
 	gather_dir_contents(ent.path, *ent.ptr);
 }
 
-Dir_ptr get_dir_ptr(const Path& p)
+void load_dir_ptr(Dir_ptr& ptr, const Path& p)
 {
+	ptr.reset();
+
+	Cache_list::Node_handle nh;
+	if (s_state.entries.find(p.hash(), nh))
 	{
-		Cache_list::Node_handle nh;
-		if (s_state.entries.find(p.hash(), nh))
-		{
-			Cache_entry& ent = nh.get();
-			if (ent.dirty.load(std::memory_order_acquire))
-				rebuild_cache_entry(ent);
+		Cache_entry& ent = nh.get();
+		if (ent.dirty.load(std::memory_order_acquire))
+			rebuild_cache_entry(ent);
 
-			return ent.ptr;
-		}
-		else
-		{
-			s_state.entries.free_ptrs();
-			soft_interruption_point();
+		ptr = ent.ptr;
+		return;
+	}
+	else
+	{
+		s_state.entries.free_ptrs();
+		soft_interruption_point();
 
-			Dir_ptr ptr;
-			Cache_list::Fn update_entry = [&](Cache_entry& e) {
-				build_cache_entry(e, p, std::move(e.ptr));
-				ptr = e.ptr;
-			};
+		Cache_list::Fn update_entry = [&](Cache_entry& e) {
+			build_cache_entry(e, p, std::move(e.ptr));
+			ptr = e.ptr;
+		};
 
-			if (s_state.entries.try_reclaim_free_ptr(update_entry))
-				return ptr;
-		}
+		if (s_state.entries.try_reclaim_free_ptr(update_entry))
+			return;
 	}
 
 	Cache_entry ent;
 	build_cache_entry(ent, p, std::make_shared<Dir_vector>());
 
-	return s_state.entries.push_front(std::move(ent));
+	ptr = ent.ptr;
+	s_state.entries.push_front(std::move(ent));
 }
 
 void destroy_free_dir_ptrs(int free_ptrs)

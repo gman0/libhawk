@@ -36,25 +36,24 @@ namespace hawk
 
 	// Note: existing Dir_ptr's and their Dir_cursor's (Dir_vector
 	// iterators) may become invalid after calling On_fs_change.
-	// It is advised to not keep Dir_ptr's without calling get_dir_ptr
+	// It is advised not to keep Dir_ptr's without calling get_dir_ptr
 	// afterwards.
 	using Dir_vector = std::vector<Dir_entry>;
 	using Dir_cursor = Dir_vector::iterator;
 	using Dir_const_cursor = Dir_vector::const_iterator;
 	using Dir_ptr = std::shared_ptr<Dir_vector>;
 
-
-	using On_fs_change_f = std::function<
+	using On_fs_change = std::function<
 		void(const std::vector<size_t>&)>;
-	using On_sort_change_f = std::function<void()>;
+	using On_sort_change = std::function<void()>;
 	using Dir_sort_predicate = std::function<
 		bool(const Dir_entry&, const Dir_entry&)>;
 	using Populate_user_data = std::function<void(const Path&, User_data&)>;
 
 	// Starts a thread that checks filesystem every second and
 	// updates cache entries if needed.
-	void _start_filesystem_watchdog(On_fs_change_f&& on_fs_change,
-									On_sort_change_f&& on_sort_change,
+	void _start_filesystem_watchdog(On_fs_change&& on_fs_change,
+									On_sort_change&& on_sort_change,
 									Populate_user_data&& populate);
 
 	// More or less for internal purposes...
@@ -65,7 +64,15 @@ namespace hawk
 	void set_sort_predicate(Dir_sort_predicate&& pred);
 	Dir_sort_predicate get_sort_predicate();
 
-	Dir_ptr get_dir_ptr(const Path& p);
+	// Returns a shared pointer with sorted directory entries.
+	// The directory path is checked every second by filesystem-watchdog
+	// for changes and updated if needed. Access to the particular cache entry
+	// is thread-unsafe only during the call to On_fs_change.
+	//
+	// When the use-count of the shared pointer drops to 1 (i.e. owned only by
+	// the filesystem-watchdog), it's marked as free and the memory allocated
+	// for the vector pointed to by Dir_ptr may be reused by another cache entry.
+	void load_dir_ptr(Dir_ptr& ptr, const Path& directory);
 
 	// Destroy nfree_ptrs free pointers.
 	void destroy_free_dir_ptrs(int nfree_ptrs);
