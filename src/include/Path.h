@@ -61,8 +61,14 @@ namespace hawk {
 		friend bool operator==(const Path& rhs, const Path& lhs);
 		friend bool operator!=(const Path& rhs, const Path& lhs);
 
+		// Checks for string equality instead of comparing Paths' hashes.
+		// Use this method instead of operator== when only a single
+		// comparison is needed as it is more efficient.
+		bool string_equals(const Path& p) const;
+
 		// Concatenate two paths.
 		Path& operator/=(const Path& p);
+		Path& operator/=(const char* p);
 
 		const char* c_str() const;
 		const std::string& string() const;
@@ -94,9 +100,14 @@ namespace hawk {
 
 	// Concatenate two paths.
 	Path operator/(const Path& lhs, const Path& rhs);
+	Path operator/(const Path& lhs, const char* rhs);
+	Path operator/(const char* lhs, const Path& rhs);
+
 	// Compare two paths by comparing their hashes.
 	bool operator==(const Path& rhs, const Path& lhs);
 	bool operator!=(const Path& rhs, const Path& lhs);
+
+	bool is_absolute(const char* path);
 }
 
 #endif // HAWK_PATH_H

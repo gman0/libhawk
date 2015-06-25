@@ -52,6 +52,11 @@ bool operator!=(const Path& rhs, const Path& lhs)
 	return const_cast<Path&>(rhs).hash() != const_cast<Path&>(lhs).hash();
 }
 
+bool Path::string_equals(const Path& p) const
+{
+	return m_path == p.m_path;
+}
+
 Path& Path::operator/=(const Path& p)
 {
 	if (p.empty())
@@ -73,6 +78,17 @@ Path& Path::operator/=(const Path& p)
 		m_path += rhs.m_path;
 	}
 
+	m_hash = 0;
+
+	return *this;
+}
+
+Path& Path::operator/=(const char* p)
+{
+	if (*p != '/')
+		append_separator_if_needed();
+
+	m_path += p;
 	m_hash = 0;
 
 	return *this;
@@ -133,26 +149,28 @@ Path Path::parent_path() const
 	auto pos = m_path.rfind('/');
 
 	if (pos == std::string::npos) return Path {};
-	if (pos == 0)
-	{
-		return (m_path[1] == '\0') ? Path {} : Path {"/"};
-	}
+	if (pos == 0) return (m_path[1] == '\0') ? Path {} : Path {"/"};
 
 	return Path {m_path.c_str(), --pos};
 }
 
 void Path::set_parent_path()
 {
-	auto pos = m_path.rfind('/');
+	const std::string::size_type pos = m_path.rfind('/');
 
 	if (pos == std::string::npos)
 		m_path.clear();
 	else
 	{
-		if (pos == 0 && m_path[1] != '\0')
-			m_path = "/";
+		if (pos == 0)
+		{
+			if (m_path[1] == '\0')
+				m_path.clear();
+			else
+				m_path[1] = '\0';
+		}
 		else
-			m_path = m_path.substr(0, pos - 1);
+			m_path[pos] = '\0';
 	}
 
 	m_hash = 0;
@@ -197,6 +215,21 @@ void Path::append_separator_if_needed()
 {
 	if (!m_path.empty() && m_path.back() != '/')
 		m_path += '/';
+}
+
+bool is_absolute(const char* path)
+{
+	return *path == '/';
+}
+
+Path operator/(const Path& lhs, const char* rhs)
+{
+	return Path{lhs} /= rhs;
+}
+
+Path operator/(const char* lhs, const Path& rhs)
+{
+	return Path{lhs} /= rhs;
 }
 
 } // namespace hawk
