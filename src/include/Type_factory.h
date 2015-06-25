@@ -47,10 +47,6 @@ namespace hawk {
 		void register_type(size_t type, const Handler& tp);
 
 		// Returns a handler for supplied hash or deduced file type.
-		Handler operator[](size_t type);
-		Handler operator[](const Path& p);
-
-		// The same as for operator[]'s.
 		Handler get_handler(size_t type);
 		Handler get_handler(const Path& p);
 

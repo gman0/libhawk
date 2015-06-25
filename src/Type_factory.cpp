@@ -78,7 +78,7 @@ void Type_factory::register_type(size_t type,
 	m_types[type] = tp;
 }
 
-Type_factory::Handler Type_factory::operator[](size_t type)
+Type_factory::Handler Type_factory::get_handler(size_t type)
 {
 	auto it = std::find_if(m_types.begin(), m_types.end(),
 		[type](const Type_map::value_type& v) {
@@ -100,19 +100,9 @@ Type_factory::Handler Type_factory::operator[](size_t type)
 	return it->second;
 }
 
-Type_factory::Handler Type_factory::operator[](const Path& p)
-{
-	return operator[](get_hash_type(p));
-}
-
-Type_factory::Handler Type_factory::get_handler(size_t type)
-{
-	return operator[](type);
-}
-
 Type_factory::Handler Type_factory::get_handler(const Path& p)
 {
-	return operator[](p);
+	return get_handler(get_hash_type(p));
 }
 
 const char* Type_factory::get_mime(const Path& p)
