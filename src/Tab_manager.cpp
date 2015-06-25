@@ -31,7 +31,7 @@ using Hash_vector = std::vector<size_t>;
 
 Tab_manager::Tab_manager(Type_factory* tf, unsigned ncols,
 						 Populate_user_data&& populate_user_data,
-						 Exception_handler&& eh)
+						 Tab_manager::Exception_handler&& eh)
 	:
 	  m_type_factory{tf},
 	  m_exception_handler{eh},
@@ -49,6 +49,17 @@ Tab_manager::Tab_manager(Type_factory* tf, unsigned ncols,
 							   std::move(populate_user_data));
 }
 
+Tab* Tab_manager::add_tab(const Path& directory)
+{
+	auto prev_it = --m_tabs.end();
+	m_tabs.emplace_back(directory, m_exception_handler,
+						m_ncols, m_type_factory, m_list_dir_closure,
+						std::chrono::milliseconds{50});
+	auto curr_it = --m_tabs.end();
+
+	return (prev_it == curr_it) ? nullptr : &(*curr_it);
+}
+
 void Tab_manager::on_fs_change(const Hash_vector& hvec)
 {
 	std::vector<Tab_list::iterator> tabs;
@@ -64,11 +75,11 @@ void Tab_manager::on_fs_change(const Hash_vector& hvec)
 			// Try to find a columns with the supplied path.
 			// It's more likely that the result will be found quicker
 			// when we'll be searching for it in reverse order.
-			const auto col_it = std::find_if(
-						ld_vec.crbegin(), ld_vec.crend(),
-						[path_hash](const Tab::List_dir_ptr& col) {
-					return col->get_path().hash() == path_hash;
-			});
+			const auto col_it =
+				std::find_if(ld_vec.crbegin(), ld_vec.crend(),
+					[path_hash](const Tab::List_dir_ptr& col) {
+						return col->get_path().hash() == path_hash;
+					});
 
 			if (col_it != ld_vec.rend())
 				break;
@@ -80,7 +91,7 @@ void Tab_manager::on_fs_change(const Hash_vector& hvec)
 
 	std::unique(tabs.begin(), tabs.end());
 	for (auto tab_it : tabs)
-		tab_it->set_path(tab_it->get_path());
+		tab_it->reload_path();
 }
 
 void Tab_manager::on_sort_change()

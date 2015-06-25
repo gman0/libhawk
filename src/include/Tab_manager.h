@@ -53,18 +53,7 @@ namespace hawk {
 		Tab_manager(Tab_manager&&) = delete;
 		Tab_manager& operator=(Tab_manager&&) = delete;
 
-		template <typename Path_>
-		Tab* add_tab(Path_&& path)
-		{
-			auto prev_it = --m_tabs.end();
-			m_tabs.emplace_back(std::forward<Path_>(path), m_exception_handler,
-								m_ncols, m_type_factory, m_list_dir_closure,
-								std::chrono::milliseconds{50});
-			auto curr_it = --m_tabs.end();
-
-			return (prev_it == curr_it) ? nullptr : &(*curr_it);
-		}
-
+		Tab* add_tab(const Path& directory);
 		Tab_list& get_tabs();
 
 	private:
