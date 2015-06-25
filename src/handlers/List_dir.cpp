@@ -104,7 +104,7 @@ void List_dir::acquire_cursor()
 
 void List_dir::set_cursor(Dir_cursor cursor)
 {
-	m_cursor = std::move(cursor);
+	m_cursor = cursor;
 
 	if (m_dir_ptr->empty())
 		return;
@@ -152,7 +152,7 @@ void List_dir::set_path(const Path& dir)
 		return;
 	}
 
-	struct stat st = status(dir);
+	Stat st = status(dir);
 
 	if (!is_directory(st))
 		throw Filesystem_error {dir, ENOTDIR};
@@ -161,7 +161,7 @@ void List_dir::set_path(const Path& dir)
 		throw Filesystem_error {dir, EPERM};
 
 	Column::set_path(dir);
-	m_dir_ptr = get_dir_ptr(dir);
+	load_dir_ptr(m_dir_ptr, dir);
 	acquire_cursor();
 }
 
