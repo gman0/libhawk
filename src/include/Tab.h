@@ -85,7 +85,7 @@ namespace hawk {
 			std::chrono::steady_clock> m_preview_timestamp;
 
 		Type_factory* m_type_factory;
-		Type_factory::Handler m_list_dir_closure;
+		Type_factory::Handler m_list_dir_closure; // don't need this
 
 		Interruptible_thread m_tasking_thread;
 		struct Tasking
@@ -133,6 +133,9 @@ namespace hawk {
 
 		Path get_path() const;
 		void set_path(Path path);
+		// Atomically reloads current path.
+		// Equivalent to calling set_path(get_path()) but atomic.
+		void reload_path();
 
 		const List_dir_vector& get_columns() const;
 
@@ -160,7 +163,7 @@ namespace hawk {
 		void create_preview(const Path& path);
 		void destroy_preview();
 
-		void task_set_path(const Path& path);
+		void task_load_path(const Path& path);
 		void task_create_preview(const Path& path);
 	};
 }

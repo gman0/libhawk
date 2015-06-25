@@ -32,6 +32,8 @@
 
 namespace hawk {
 
+namespace {
+
 struct Global_guard
 {
 	std::atomic<bool>& global;
@@ -41,33 +43,28 @@ struct Global_guard
 	{ global.store(false, std::memory_order_release); }
 };
 
-static std::vector<Path> dissect_path(Path& p, int ncols)
+std::vector<Path> dissect_path(Path& p, int ncols)
 {
 	std::vector<Path> paths(ncols + 1);
 
 	for (; ncols >= 0; ncols--)
 	{
 		paths[ncols] = p;
-		p = p.parent_path();
+		p.set_parent_path();
 	}
 
 	return paths;
 }
 
-static int get_empty_columns(const Tab::List_dir_vector& ld_vec)
+int count_empty_columns(const Tab::List_dir_vector& v)
 {
-	int n = 0;
-	for (auto& col : ld_vec)
-	{
-		if (col->get_path().empty())
-			++n;
-	}
-
-	return n;
+	return std::count_if(v.begin(), v.end(), [](const auto& c) {
+		return c->get_path().empty();
+	});
 }
 
 // Checks path for validity
-static void check_and_rollback_path(Path& p, const Path& old_p)
+void check_and_rollback_path(Path& p, const Path& old_p)
 {
 	if (is_readable(p)) return; // We're good to go.
 
@@ -76,11 +73,13 @@ static void check_and_rollback_path(Path& p, const Path& old_p)
 
 	// Otherwise roll back to the parent directory until it's readable.
 	while (!is_readable(p))
-		p = p.parent_path();
+		p.set_parent_path();
 
 	if (p.empty())
 		p = "/";
 }
+
+} // unnamed-namespace
 
 Tab::~Tab()
 {
@@ -108,10 +107,10 @@ Path Tab::get_path() const
 		p = m_path;
 	}
 
-	return m_path;
+	return p;
 }
 
-void Tab::task_set_path(const Path& p)
+void Tab::task_load_path(const Path& p)
 {
 	Global_guard gg {m_tasking.global};
 
@@ -119,13 +118,7 @@ void Tab::task_set_path(const Path& p)
 	soft_interruption_point();
 
 	update_active_cursor();
-	destroy_free_dir_ptrs(get_empty_columns(m_columns) + 1);
-	soft_interruption_point();
-
-	{
-		std::lock_guard<std::shared_timed_mutex> lk {m_path_sm};
-		m_path = p;
-	}
+	destroy_free_dir_ptrs(count_empty_columns(m_columns) + 1);
 }
 
 void Tab::set_path(Path p)
@@ -142,7 +135,22 @@ void Tab::set_path(Path p)
 
 	std::unique_lock<std::mutex> lk {m_tasking.m};
 	m_tasking.run_task(lk, [&, p]{
-		task_set_path(p);
+		task_load_path(p);
+
+		std::lock_guard<std::shared_timed_mutex> lk {m_path_sm};
+		m_path = p;
+	});
+}
+
+void Tab::reload_path()
+{
+	std::unique_lock<std::shared_timed_mutex> lk_path {m_path_sm};
+	check_and_rollback_path(m_path, m_path);
+
+	m_tasking_thread.soft_interrupt();
+	std::unique_lock<std::mutex> lk {m_tasking.m};
+	m_tasking.run_task(lk, [this, l {std::move(lk_path)}]{
+		task_load_path(m_path);
 	});
 }
 
@@ -206,7 +214,7 @@ void Tab::update_paths(Path p)
 	ready_column(*m_columns[ncols], p);
 	for (int i = ncols - 1; i >= 0; i--)
 	{
-		p = p.parent_path();
+		p.set_parent_path();
 		ready_column(*m_columns[i], p);
 	}
 }
@@ -246,13 +254,13 @@ void Tab::create_preview(const Path& p)
 	m_tasking_thread.soft_interrupt();
 	m_tasking.run_task(lk, [&, p]{
 		// If the user is scrolling the cursor too fast, don't
-		// create the preview immediately. Instead, wait
-		// m_preview_delay milliseconds, while checking for
+		// create the preview immediately. Instead, wait for
+		// m_preview_delay milliseconds whilst checking for
 		// interrupts.
 		auto now = std::chrono::steady_clock::now();
 		if (m_preview_delay + m_preview_timestamp > now)
 		{
-			for (auto t = m_preview_delay; t.count() != 0; --t)
+			for (int i = m_preview_delay.count(); i != 0; i--)
 			{
 				std::this_thread::sleep_for(
 							std::chrono::milliseconds{1});
