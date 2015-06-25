@@ -183,7 +183,10 @@ Recursive_directory_iterator& Recursive_directory_iterator::operator++()
 	Path parent_path =  back.first / *back.second;
 
 	if (is_directory(parent_path))
-		m_iter_stack.emplace_back(parent_path, Directory_iterator {parent_path});
+	{
+		m_iter_stack.emplace_back(
+					parent_path, Directory_iterator {parent_path});
+	}
 	else
 		increment();
 
@@ -233,13 +236,33 @@ bool exists(const Path& p)
 Stat status(const Path& p)
 {
 	Stat st;
-	if (lstat64(p.c_str(), &st) == -1)
+	if (stat64(p.c_str(), &st) == -1)
 		throw Filesystem_error {p, errno};
 
 	return st;
 }
 
 Stat status(const Path& p, int& err) noexcept
+{
+	Stat st;
+	if (stat64(p.c_str(), &st) == -1)
+		err = errno;
+	else
+		err = 0;
+
+	return st;
+}
+
+Stat symlink_status(const Path& p)
+{
+	Stat st;
+	if (lstat64(p.c_str(), &st) == -1)
+		throw Filesystem_error {p, errno};
+
+	return st;
+}
+
+Stat symlink_status(const Path& p, int& err) noexcept
 {
 	Stat st;
 	if (lstat64(p.c_str(), &st) == -1)
@@ -367,6 +390,37 @@ Path canonical(const Path& p, const Path& base, int& err) noexcept
 	return Path {buf.ptr};
 }
 
+Path read_symlink(const Path& p)
+{
+	char deref[PATH_MAX + 1];
+	int dlen = readlink(p.c_str(), deref, PATH_MAX);
+
+	if (dlen < 0)
+		throw Filesystem_error {p, errno};
+
+	deref[dlen] = '\0';
+
+	return Path(deref, dlen);
+}
+
+Path read_symlink(const Path& p, int& err) noexcept
+{
+	char deref[PATH_MAX + 1];
+	int dlen = readlink(p.c_str(), deref, PATH_MAX);
+
+	if (dlen < 0)
+	{
+		err = errno;
+		return Path {};
+	}
+
+	deref[dlen] = '\0';
+	err = 0;
+
+	return Path(deref, dlen);
+}
+
+
 Space_info space(const Path& p)
 {
 	struct statvfs64 stvfs;
@@ -482,6 +536,77 @@ void copy_permissions(const Path& from, const Path& to)
 {
 	if (chmod(to.c_str(), status(from).st_mode) != 0)
 		throw Filesystem_error {to, errno};
+}
+
+void remove_file(const Path& p)
+{
+	if (unlink(p.c_str()) != 0)
+		throw Filesystem_error {p, errno};
+}
+
+void remove_file(const Path& p, int& err) noexcept
+{
+	if (unlink(p.c_str()) != 0)
+		err = errno;
+	else
+		err = 0;
+}
+
+void remove_directory(const Path& p)
+{
+	if (rmdir(p.c_str()) != 0)
+		throw Filesystem_error {p, errno};
+}
+
+void remove_directory(const Path& p, int& err) noexcept
+{
+	if (rmdir(p.c_str()) != 0)
+		err = errno;
+	else
+		err = 0;
+}
+
+void remove_ndirectories(int count, Path&& directory)
+{
+	for (; count >= 0; count--)
+	{
+		remove_directory(directory);
+		directory.set_parent_path();
+	}
+}
+
+void remove_recursively(const Path& dir)
+{
+	Path prev_path;
+	int prev_level = 0;
+
+	Recursive_directory_iterator it {dir};
+	while (!it.at_end())
+	{
+		if (prev_level > it.level())
+		{
+			// We've left a directory/directories which means
+			// they're now empty and should be safe to remove.
+			remove_ndirectories(
+						prev_level - it.level() - 1, std::move(prev_path));
+		}
+
+		Path p = dir / *it;
+		Stat st = symlink_status(p);
+		prev_level = it.level();
+
+		if (is_symlink(st))
+			it.orthogonal_increment(); // Don't iterate through symlinks.
+		else
+			++it;
+
+		if (!is_directory(st))
+			remove_file(p);
+		else
+			prev_path = p;
+	}
+
+	remove_ndirectories(prev_level, std::move(prev_path));
 }
 
 } // namespace hawk

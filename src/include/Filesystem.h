@@ -120,12 +120,13 @@ namespace hawk {
 	class Filesystem_error : public std::exception
 	{
 	private:
+		Path m_path;
 		std::string m_what;
 		int m_errno;
 
 	public:
 		Filesystem_error(const Path& p, int err)
-			: m_what{p.c_str()}, m_errno{err}
+			: m_path{p}, m_what{p.c_str()}, m_errno{err}
 		{
 			char msg[128];
 			msg[127] = '\0';
@@ -144,6 +145,7 @@ namespace hawk {
 			return m_what.c_str();
 		}
 
+		const Path& get_source() const { return m_path; }
 		int get_errno() const { return m_errno; }
 	};
 
@@ -162,6 +164,8 @@ namespace hawk {
 
 	Stat status(const Path& p);
 	Stat status(const Path& p, int& err) noexcept;
+	Stat symlink_status(const Path& p);
+	Stat symlink_status(const Path& p, int& err) noexcept;
 
 	bool is_readable(const Path& p) noexcept;
 	bool is_readable(const Stat& st) noexcept;
@@ -190,6 +194,9 @@ namespace hawk {
 	Path canonical(const Path& p, const Path& base);
 	Path canonical(const Path& p, const Path& base, int& err) noexcept;
 
+	Path read_symlink(const Path& p);
+	Path read_symlink(const Path& p, int& err) noexcept;
+
 	Space_info space(const Path& p);
 	Space_info space(const Path& p, int& err) noexcept;
 
@@ -208,6 +215,22 @@ namespace hawk {
 	void create_symlink(const Path& target, const Path& linkpath);
 	void create_symlink(const Path& target, const Path& linkpath,
 						int& err) noexcept;
+
+	void remove_file(const Path& p);
+	void remove_file(const Path& p, int& err) noexcept;
+
+	void remove_directory(const Path& p);
+	void remove_directory(const Path& p, int& err) noexcept;
+
+	// Remove `count' empty direcotries. `directory' is the path
+	// to the lowest directory in a particular directory tree.
+	//
+	// Example: directory is /a/b/c/d/e/f, count is 2.
+	// Directories /a/b/c/d/e/f, /a/b/c/d/e, /a/b/c/d will be removed.
+	void remove_ndirectories(int count, Path&& directory);
+
+	// Remove a directory and its contents.
+	void remove_recursively(const Path& directory);
 }
 
 #endif // HAWK_FILESYSTEM_H
