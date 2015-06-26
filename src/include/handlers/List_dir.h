@@ -24,13 +24,13 @@
 #include <string>
 #include <ctime>
 #include <utility>
-#include "Column.h"
+#include "View.h"
 #include "Dir_cache.h"
 
 namespace hawk {
 	class Cursor_cache;
 
-	class List_dir : public Column
+	class List_dir : public View
 	{
 	public:
 		enum class Cursor_search_direction

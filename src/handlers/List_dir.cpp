@@ -24,9 +24,9 @@
 #include <unistd.h>
 #include "handlers/List_dir.h"
 #include "handlers/List_dir_hash.h"
-#include "Tab.h"
+#include "View_group.h"
 #include "Cursor_cache.h"
-#include "Column.h"
+#include "View.h"
 #include "Filesystem.h"
 
 namespace hawk {
@@ -77,7 +77,7 @@ static Dir_cursor match_directed_cursor(
 
 void List_dir::acquire_cursor()
 {
-	if (m_next_column)
+	if (m_next_view)
 	{
 		set_cursor(get_next_path()->filename(), Cursor_search_direction::begin);
 		return;
@@ -160,7 +160,7 @@ void List_dir::set_path(const Path& dir)
 	if (!is_readable(st))
 		throw Filesystem_error {dir, EPERM};
 
-	Column::set_path(dir);
+	View::set_path(dir);
 	load_dir_ptr(m_dir_ptr, dir);
 	acquire_cursor();
 }

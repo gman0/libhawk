@@ -720,7 +720,7 @@ void IO_task_move::update_symlinks(const Path& src, const Path& dst)
 		if (is_symlink(symlink_status(abs_dst)))
 		{
 			it.orthogonal_increment();
-\
+
 			Path target = read_symlink(abs_dst);
 			if (!target.is_absolute())
 				continue;

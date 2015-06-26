@@ -22,8 +22,8 @@
 #include <exception>
 #include <chrono>
 #include <utility>
-#include "Tab.h"
-#include "Column.h"
+#include "View_group.h"
+#include "View.h"
 #include "handlers/List_dir.h"
 #include "Dir_cache.h"
 #include "Interruptible_thread.h"
@@ -43,20 +43,20 @@ struct Global_guard
 	{ global.store(false, std::memory_order_release); }
 };
 
-std::vector<Path> dissect_path(Path& p, int ncols)
+std::vector<Path> dissect_path(Path& p, int nviews)
 {
-	std::vector<Path> paths(ncols + 1);
+	std::vector<Path> paths(nviews + 1);
 
-	for (; ncols >= 0; ncols--)
+	for (; nviews >= 0; nviews--)
 	{
-		paths[ncols] = p;
+		paths[nviews] = p;
 		p.set_parent_path();
 	}
 
 	return paths;
 }
 
-int count_empty_columns(const Tab::List_dir_vector& v)
+int count_empty_views(const View_group::List_dir_vector& v)
 {
 	return std::count_if(v.begin(), v.end(), [](const auto& c) {
 		return c->get_path().empty();
@@ -81,7 +81,7 @@ void check_and_rollback_path(Path& p, const Path& old_p)
 
 } // unnamed-namespace
 
-Tab::~Tab()
+View_group::~View_group()
 {
 	if (!m_tasking_thread.joinable())
 		return;
@@ -98,7 +98,7 @@ Tab::~Tab()
 	m_tasking_thread.join();
 }
 
-Path Tab::get_path() const
+Path View_group::get_path() const
 {
 	Path p;
 
@@ -110,7 +110,7 @@ Path Tab::get_path() const
 	return p;
 }
 
-void Tab::task_load_path(const Path& p)
+void View_group::task_load_path(const Path& p)
 {
 	Global_guard gg {m_tasking.global};
 
@@ -118,10 +118,10 @@ void Tab::task_load_path(const Path& p)
 	soft_interruption_point();
 
 	update_active_cursor();
-	destroy_free_dir_ptrs(count_empty_columns(m_columns) + 1);
+	destroy_free_dir_ptrs(count_empty_views(m_views) + 1);
 }
 
-void Tab::set_path(Path p)
+void View_group::set_path(Path p)
 {
 	try { p = canonical(p, m_path); }
 	catch (...) { m_tasking.exception_handler(std::current_exception()); }
@@ -142,7 +142,7 @@ void Tab::set_path(Path p)
 	});
 }
 
-void Tab::reload_path()
+void View_group::reload_path()
 {
 	std::unique_lock<std::shared_timed_mutex> lk_path {m_path_sm};
 	check_and_rollback_path(m_path, m_path);
@@ -154,98 +154,98 @@ void Tab::reload_path()
 	});
 }
 
-const Tab::List_dir_vector& Tab::get_columns() const
+const View_group::List_dir_vector& View_group::get_views() const
 {
-	return m_columns;
+	return m_views;
 }
 
-void Tab::set_cursor(Dir_cursor cursor)
+void View_group::set_cursor(Dir_cursor cursor)
 {
 	if (can_set_cursor())
 	{
-		List_dir_ptr& ld = m_columns.back();
+		List_dir_ptr& ld = m_views.back();
 		ld->set_cursor(cursor);
 		create_preview({ld->get_path() / cursor->path});
 	}
 }
 
-void Tab::set_cursor(const Path& filename,
+void View_group::set_cursor(const Path& filename,
 					 List_dir::Cursor_search_direction dir)
 {
 	if (can_set_cursor())
 	{
-		List_dir_ptr& ld = m_columns.back();
+		List_dir_ptr& ld = m_views.back();
 		ld->set_cursor(filename, dir);
 		create_preview({ld->get_path() / ld->get_cursor()->path});
 	}
 }
 
-void Tab::build_columns(int ncols)
+void View_group::build_views(int nviews)
 {
-	instantiate_columns(ncols);
-	initialize_columns(ncols);
+	instantiate_views(nviews);
+	initialize_views(nviews);
 
 	update_active_cursor();
 }
 
-void Tab::instantiate_columns(int ncols)
+void View_group::instantiate_views(int nviews)
 {
-	add_column(m_list_dir_closure);
-	for (int i = 1; i <= ncols; i++)
+	add_view(m_list_dir_closure);
+	for (int i = 1; i <= nviews; i++)
 	{
-		add_column(m_list_dir_closure);
-		m_columns[i - 1]->_set_next_column(m_columns[i].get());
+		add_view(m_list_dir_closure);
+		m_views[i - 1]->_set_next_view(m_views[i].get());
 	}
 }
 
-void Tab::initialize_columns(int ncols)
+void View_group::initialize_views(int nviews)
 {
 	Path p = m_path;
-	std::vector<Path> paths = dissect_path(p, ncols);
+	std::vector<Path> paths = dissect_path(p, nviews);
 
-	for (; ncols >= 0; ncols--)
-		ready_column(*m_columns[ncols], paths[ncols]);
+	for (; nviews >= 0; nviews--)
+		ready_view(*m_views[nviews], paths[nviews]);
 }
 
-void Tab::update_paths(Path p)
+void View_group::update_paths(Path p)
 {
-	int ncols = m_columns.size() - 1;
+	int nviews = m_views.size() - 1;
 
-	ready_column(*m_columns[ncols], p);
-	for (int i = ncols - 1; i >= 0; i--)
+	ready_view(*m_views[nviews], p);
+	for (int i = nviews - 1; i >= 0; i--)
 	{
 		p.set_parent_path();
-		ready_column(*m_columns[i], p);
+		ready_view(*m_views[i], p);
 	}
 }
 
-void Tab::add_column(const Type_factory::Handler& closure)
+void View_group::add_view(const Type_factory::Handler& closure)
 {
-	m_columns.emplace_back(static_cast<List_dir*>(closure()));
+	m_views.emplace_back(static_cast<List_dir*>(closure()));
 }
 
-void Tab::ready_column(Column& col, const Path& p)
+void View_group::ready_view(View& v, const Path& p)
 {
-	col.set_path(p);
-	col.ready();
+	v.set_path(p);
+	v.ready();
 }
 
-void Tab::update_active_cursor()
+void View_group::update_active_cursor()
 {
 	if (can_set_cursor())
 	{
-		List_dir_ptr& ld = m_columns.back();
+		List_dir_ptr& ld = m_views.back();
 		task_create_preview({ld->get_path() / ld->get_cursor()->path});
 	}
 }
 
-bool Tab::can_set_cursor()
+bool View_group::can_set_cursor()
 {
 	destroy_preview();
-	return !m_columns.back()->get_contents().empty();
+	return !m_views.back()->get_contents().empty();
 }
 
-void Tab::create_preview(const Path& p)
+void View_group::create_preview(const Path& p)
 {
 	std::unique_lock<std::mutex> lk {m_tasking.m};
 	if (m_tasking.global.load(std::memory_order_acquire))
@@ -273,7 +273,7 @@ void Tab::create_preview(const Path& p)
 	});
 }
 
-void Tab::task_create_preview(const Path& p)
+void View_group::task_create_preview(const Path& p)
 {
 	auto handler = m_type_factory->get_handler(p);
 	if (!handler) return;
@@ -281,7 +281,7 @@ void Tab::task_create_preview(const Path& p)
 	m_preview.reset(handler());
 	soft_interruption_point();
 
-	try { ready_column(*m_preview, p); }
+	try { ready_view(*m_preview, p); }
 	catch (...)
 	{
 		destroy_preview();
@@ -289,12 +289,12 @@ void Tab::task_create_preview(const Path& p)
 	}
 }
 
-void Tab::destroy_preview()
+void View_group::destroy_preview()
 {
 	m_preview.reset();
 }
 
-void Tab::Tasking::run_task(std::unique_lock<std::mutex>& lk,
+void View_group::Tasking::run_task(std::unique_lock<std::mutex>& lk,
 							std::function<void()>&& f)
 {
 	cv.wait(lk, [this]{ return ready_for_tasking; });
@@ -306,7 +306,7 @@ void Tab::Tasking::run_task(std::unique_lock<std::mutex>& lk,
 	cv.notify_one();
 }
 
-void Tab::Tasking::operator()()
+void View_group::Tasking::operator()()
 {
 	std::unique_lock<std::mutex> lk {m, std::defer_lock};
 

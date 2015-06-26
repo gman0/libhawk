@@ -25,7 +25,7 @@
 #include <vector>
 #include <utility>
 #include "Path.h"
-#include "Column.h"
+#include "View.h"
 
 namespace hawk {
 	struct Magic_guard;
@@ -33,7 +33,7 @@ namespace hawk {
 	class Type_factory
 	{
 	public:
-		using Handler = std::function<Column*()>;
+		using Handler = std::function<View*()>;
 
 	private:
 		Magic_guard* m_magic_guard;

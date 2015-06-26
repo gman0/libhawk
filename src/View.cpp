@@ -19,48 +19,48 @@
 
 #include <utility>
 #include <exception>
-#include "Column.h"
-#include "Tab.h"
+#include "View.h"
+#include "View_group.h"
 
 namespace hawk {
 
-Column::Column(Column&& col) noexcept
+View::View(View&& v) noexcept
 	:
-	  m_path{std::move(col.m_path)},
-	  m_next_column{col.m_next_column}
+	  m_path{std::move(v.m_path)},
+	  m_next_view{v.m_next_view}
 {
-	col.m_next_column = nullptr;
+	v.m_next_view = nullptr;
 }
 
-Column& Column::operator=(Column&& col) noexcept
+View& View::operator=(View&& v) noexcept
 {
-	if (&col == this)
+	if (&v == this)
 		return *this;
 
-	m_path = std::move(col.m_path);
-	m_next_column = col.m_next_column;
+	m_path = std::move(v.m_path);
+	m_next_view = v.m_next_view;
 
-	col.m_next_column = nullptr;
+	v.m_next_view = nullptr;
 
 	return *this;
 }
 
-void Column::_set_next_column(const Column* next_column)
+void View::_set_next_view(const View* next_view)
 {
-	m_next_column = next_column;
+	m_next_view = next_view;
 }
 
-const Path& Column::get_path() const
+const Path& View::get_path() const
 {
 	return m_path;
 }
 
-const Path* Column::get_next_path() const
+const Path* View::get_next_path() const
 {
-	return m_next_column ? &m_next_column->get_path() : nullptr;
+	return m_next_view ? &m_next_view->get_path() : nullptr;
 }
 
-void Column::set_path(const Path& p)
+void View::set_path(const Path& p)
 {
 	m_path = p;
 }

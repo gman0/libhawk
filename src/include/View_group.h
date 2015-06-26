@@ -38,37 +38,36 @@
 
 namespace hawk {
 	class Cursor_cache;
-	class Column;
+	class View;
 	class List_dir;
-	class Preview;
 
 	/// Exception safety
 	//  User's code can safely throw exceptions with these guarantees:
-	//   * throwing an exception during Tab initialization (ie. when
-	//     calling build_columns - where the user code being the
-	//     constructor of a class inherting from Column, set_path virtual
-	//     method and ready pure virtual method) causes the Tab to cease
+	//   * throwing an exception during View_group initialization (ie. when
+	//     calling build_views - where the user code being the
+	//     constructor of a class inherting from View, set_path virtual
+	//     method and ready pure virtual method) causes the View_group to cease
 	//     its construction,
-	//   * throwing an exception while creating a preview column
-	//     (ie. constructor, set_path, ready) causes the preview column
+	//   * throwing an exception while creating a preview
+	//     (ie. constructor, set_path, ready) causes the preview
 	//     to cease its construction,
-	//   * throwing an exception while setting Tab path by calling set_path
-	//     (which subsequently calls set_path of every Column) causes the
-	//     path to be reset to its previous value. If this call fails again
-	//     by throwing an exception, the parent path of current path will
-	//     be used - this will continue in a loop until call to set_path
+	//   * throwing an exception while setting View_group path by calling
+	//     set_path (which subsequently calls set_path of every View) causes
+	//     the path to be reset to its previous value. If this call fails
+	//     again by throwing an exception, the parent path of current path
+	//     will be used - this will continue in a loop until call to set_path
 	//     succeeds (thus the path may end up being "/").
 	//
 	//  Any exception thrown in any of these scenarios will be rethrown back
 	//  to the user.
 
-	// A note about Column building: when calling build_columns (during
-	// Tab construction), Column constructors are called in forward order
+	// A note about View building: when calling build_views (during
+	// View_group construction), View constructors are called in forward order
 	// but their ready methods are called in reverse.
-	class Tab
+	class View_group
 	{
 	public:
-		using Column_ptr = std::unique_ptr<Column>;
+		using View_ptr = std::unique_ptr<View>;
 		using List_dir_ptr = std::unique_ptr<List_dir>;
 		using List_dir_vector = std::vector<List_dir_ptr>;
 		using Exception_handler = std::function<
@@ -78,8 +77,8 @@ namespace hawk {
 		mutable std::shared_timed_mutex m_path_sm;
 		Path m_path;
 
-		List_dir_vector m_columns;
-		Column_ptr m_preview;
+		List_dir_vector m_views;
+		View_ptr m_preview;
 		std::chrono::milliseconds m_preview_delay;
 		std::chrono::time_point<
 			std::chrono::steady_clock> m_preview_timestamp;
@@ -111,25 +110,25 @@ namespace hawk {
 		} m_tasking;
 
 	public:
-		template <typename Path>
-		Tab(Path&& path, Exception_handler& eh, int ncols, Type_factory* tf,
-			const Type_factory::Handler& list_dir_closure,
-			std::chrono::milliseconds preview_delay)
+		View_group(
+				const Path& p, Exception_handler& eh, int nviews,
+				Type_factory* tf, const Type_factory::Handler& list_dir_closure,
+				std::chrono::milliseconds preview_delay)
 			:
-			  m_path{std::forward<Path>(path)},
+			  m_path{p},
 			  m_preview_delay{preview_delay},
 			  m_type_factory{tf},
 			  m_list_dir_closure{list_dir_closure},
 			  m_tasking{eh}
 		{
-			build_columns(--ncols);
+			build_views(--nviews);
 			m_tasking_thread = Interruptible_thread {std::ref(m_tasking)};
 		}
 
-		~Tab();
+		~View_group();
 
-		Tab(const Tab&) = delete;
-		Tab& operator=(const Tab&) = delete;
+		View_group(const View_group&) = delete;
+		View_group& operator=(const View_group&) = delete;
 
 		Path get_path() const;
 		void set_path(Path path);
@@ -137,7 +136,7 @@ namespace hawk {
 		// Equivalent to calling set_path(get_path()) but atomic.
 		void reload_path();
 
-		const List_dir_vector& get_columns() const;
+		const List_dir_vector& get_views() const;
 
 		void set_cursor(Dir_cursor cursor);
 		// See handlers/List_dir.h for Cursor_search_direction
@@ -146,9 +145,9 @@ namespace hawk {
 					List_dir::Cursor_search_direction::begin);
 
 	private:
-		void build_columns(int ncols);
-		void instantiate_columns(int ncols);
-		void initialize_columns(int ncols);
+		void build_views(int nviews);
+		void instantiate_views(int nviews);
+		void initialize_views(int nviews);
 
 		void update_paths(Path path);
 		void update_active_cursor();
@@ -156,9 +155,9 @@ namespace hawk {
 		// the cursor can be safely set.
 		bool can_set_cursor();
 
-		void add_column(const Type_factory::Handler& closure);
-		// Sets column's path and calls its ready().
-		void ready_column(Column& col, const Path& path);
+		void add_view(const Type_factory::Handler& closure);
+		// Sets view's path and calls its ready().
+		void ready_view(View& v, const Path& path);
 
 		void create_preview(const Path& path);
 		void destroy_preview();

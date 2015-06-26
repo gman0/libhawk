@@ -17,8 +17,8 @@
 	along with libhawk.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef HAWK_COLUMN_H
-#define HAWK_COLUMN_H
+#ifndef HAWK_VIEW_H
+#define HAWK_VIEW_H
 
 #include <memory>
 #include <utility>
@@ -26,43 +26,43 @@
 #include "Path.h"
 
 namespace hawk {
-	class Column
+	class View
 	{
 	protected:
 		Path m_path;
 
-		// Columns form a linked-list-like structure. This pointer
+		// Views form a linked-list-like structure. This pointer
 		// is used to set cursors properly.
-		const Column* m_next_column;
+		const View* m_next_view;
 
 	public:
-		Column() : m_next_column{nullptr} {}
-		virtual ~Column() = default;
+		View() : m_next_view{nullptr} {}
+		virtual ~View() = default;
 
-		Column(const Column&) = delete;
-		Column& operator=(const Column&) = delete;
+		View(const View&) = delete;
+		View& operator=(const View&) = delete;
 
-		Column(Column&& col) noexcept;
-		Column& operator=(Column&&) noexcept;
+		View(View&& v) noexcept;
+		View& operator=(View&& v) noexcept;
 
 		// For internal/expert use only.
-		void _set_next_column(const Column* next_column);
+		void _set_next_view(const View* next_view);
 
 		const Path& get_path() const;
 		virtual void set_path(const Path& path);
 
-		// This method is called internally by hawk::Tab when the
-		// path has been successfuly set and the Column is ready to
-		// use. Note that in List_dir this method can be called
+		// This method is called internally by hawk::View_group when the
+		// path has been successfuly set and the View is ready to
+		// use. Note that this method can be called
 		// arbitrary number of times.
 		virtual void ready() = 0;
 
 	protected:
-		// Returns nullptr when m_next_column is nullptr.
-		// Otherwise pointer to path of the next column
+		// Returns nullptr when m_next_view is nullptr.
+		// Otherwise pointer to path of the next view
 		// is returned.
 		const Path* get_next_path() const;
 	};
 }
 
-#endif // HAWK_COLUMN_H
+#endif // HAWK_VIEW_H
