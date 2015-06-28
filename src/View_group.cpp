@@ -151,6 +151,7 @@ void View_group::reload_path()
 	check_and_rollback_path(m_path, m_path);
 
 	m_tasking_thread.soft_interrupt();
+
 	std::unique_lock<std::mutex> lk {m_tasking.m};
 	m_tasking.run_task(lk, [this, l {std::move(lk_path)}]{
 		task_load_path(m_path);
@@ -164,7 +165,7 @@ const View_group::List_dir_vector& View_group::get_views() const
 
 void View_group::set_cursor(Dir_cursor cursor)
 {
-	if (can_set_cursor())
+	if (can_set_cursor(m_tasking.global.load(std::memory_order_acquire)))
 	{
 		List_dir_ptr& ld = m_views.back();
 		ld->set_cursor(cursor);
@@ -175,7 +176,7 @@ void View_group::set_cursor(Dir_cursor cursor)
 void View_group::set_cursor(const Path& filename,
 							List_dir::Cursor_search_direction dir)
 {
-	if (can_set_cursor())
+	if (can_set_cursor(m_tasking.global.load(std::memory_order_acquire)))
 	{
 		List_dir_ptr& ld = m_views.back();
 		ld->set_cursor(filename, dir);
@@ -261,26 +262,28 @@ void View_group::ready_view(View& v, const Path& p)
 
 void View_group::update_active_cursor()
 {
-	if (can_set_cursor())
+	if (can_set_cursor(false))
 	{
 		List_dir_ptr& ld = m_views.back();
 		task_create_preview({ld->get_path() / ld->get_cursor()->path});
 	}
 }
 
-bool View_group::can_set_cursor()
+bool View_group::can_set_cursor(bool override)
 {
 	destroy_preview();
+
+	if (override)
+		return false;
+
 	return !m_views.back()->get_contents().empty();
 }
 
 void View_group::create_preview(const Path& p)
 {
-	std::unique_lock<std::mutex> lk {m_tasking.m};
-	if (m_tasking.global.load(std::memory_order_acquire))
-		return;
-
 	m_tasking_thread.soft_interrupt();
+
+	std::unique_lock<std::mutex> lk {m_tasking.m};
 	m_tasking.run_task(lk, [&, p]{
 		// If the user is scrolling the cursor too fast, don't
 		// create the preview immediately. Instead, wait for

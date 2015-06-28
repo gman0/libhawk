@@ -166,7 +166,7 @@ namespace hawk {
 		void update_active_cursor();
 		// Used when calling set_cursor(). Returns true if
 		// the cursor can be safely set.
-		bool can_set_cursor();
+		bool can_set_cursor(bool override);
 
 		void add_view(const View_types::Handler& closure);
 		// Sets view's path and calls its ready().
