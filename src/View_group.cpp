@@ -226,8 +226,8 @@ void View_group::add_view(const Type_factory::Handler& closure)
 
 void View_group::ready_view(View& v, const Path& p)
 {
+	View::Ready_guard rg {v};
 	v.set_path(p);
-	v.ready();
 }
 
 void View_group::update_active_cursor()

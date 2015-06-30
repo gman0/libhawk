@@ -97,7 +97,7 @@ namespace hawk {
 
 			Exception_handler exception_handler;
 
-			Tasking(Exception_handler&& eh)
+			Tasking(const Exception_handler& eh)
 				:
 				  ready_for_tasking{true},
 				  global{false},

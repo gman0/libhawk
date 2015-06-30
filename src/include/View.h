@@ -28,6 +28,17 @@
 namespace hawk {
 	class View
 	{
+	public:
+		class Ready_guard
+		{
+		private:
+			View& v;
+
+		public:
+			Ready_guard(View& view) : v{view} { v.not_ready();}
+			~Ready_guard() { v.ready(); }
+		};
+
 	protected:
 		Path m_path;
 
@@ -51,11 +62,11 @@ namespace hawk {
 		const Path& get_path() const;
 		virtual void set_path(const Path& path);
 
-		// This method is called internally by hawk::View_group when the
-		// path has been successfuly set and the View is ready to
-		// use. Note that this method can be called
-		// arbitrary number of times.
-		virtual void ready() = 0;
+		// These two methods are called internally by hawk::View_group,
+		// encompassing set_path call. Views are thread-unsafe until ready()
+		// is called. Do your synchronization in here.
+		virtual void ready() noexcept = 0;
+		virtual void not_ready() noexcept = 0;
 
 	protected:
 		// Returns nullptr when m_next_view is nullptr.
