@@ -25,8 +25,8 @@
 namespace hawk {
 	template <typename T, typename Self>
 	using enable_if_not_self =
-		typename std::enable_if<!std::is_same<
-			typename std::decay<T>::type, Self>::value>::type;
+		std::enable_if_t<!std::is_same<
+			std::decay_t<T>, Self>::value>;
 }
 
 #endif // HAWK_NOT_SELF_TRAIT_H

@@ -55,7 +55,7 @@ namespace hawk {
 		User_data& operator=(T&& value)
 		{
 			User_data tmp = User_data {std::forward<T>(value)};
-			m_content = tmp.m_content;
+			m_content = std::move(tmp.m_content);
 
 			return *this;
 		}
@@ -76,24 +76,24 @@ namespace hawk {
 		class Holder : public Placeholder
 		{
 		public:
+			T m_held;
+
+		private:
+			constexpr static const std::type_info& tinfo = typeid(T);
+
+		public:
+			template <typename T_, typename = std::enable_if_t<
+						  std::is_pod<std::decay_t<T_>>::value>>
+			Holder(T_& value) : m_held(value)
+			{
+				check_type<T_>();
+			}
+
 			template <typename T_>
 			Holder(T_&& value)
 				: m_held{std::forward<T_>(value)}
 			{
-				static_assert(std::is_same<
-								typename std::decay<T_>::type, T>::value,
-							  "Type supplied to ctor of User_data::Holder is "
-							  "required to be the same as type supplied to "
-							  "User_data::Holder<>");
-
-				static_assert(std::is_copy_constructible<T>::value ||
-							  std::is_move_constructible<T>::value,
-							  "Type supplied to User_data needs to be "
-							  "CopyConstructible and/or MoveConstructible");
-
-				static const std::type_info& info = typeid(T);
-				assert(info == typeid(T) && "User_data can store only data of "
-					   "the same type");
+				check_type<T_>();
 			}
 
 			virtual const std::type_info& type() const noexcept
@@ -101,20 +101,36 @@ namespace hawk {
 				return typeid(T);
 			}
 
-		public:
-			T m_held;
+		private:
+			template <typename T_>
+			static constexpr void check_type()
+			{
+				static_assert(std::is_same<
+								std::decay_t<T_>, T>::value,
+							  "Type supplied to ctor of User_data::Holder is "
+							  "required to be the same as the type supplied to "
+							  "User_data::Holder<>");
+
+				static_assert(std::is_copy_constructible<T>::value ||
+							  std::is_move_constructible<T>::value,
+							  "Type supplied to User_data needs to be "
+							  "CopyConstructible and/or MoveConstructible");
+
+				assert(tinfo == typeid(T) && "User_data can store only data of "
+					   "the same type");
+			}
 		};
 
 		std::unique_ptr<Placeholder> m_content;
 
 		template <typename T>
-		friend T* user_data_cast(User_data*) noexcept;
+		friend T* user_data_cast(const User_data*) noexcept;
 	};
 
 	template <typename T>
-	T* user_data_cast(User_data* ud) noexcept
+	T* user_data_cast(const User_data* ud) noexcept
 	{
-		if (ud->type() != typeid(T))
+		if (ud->type() != typeid(T))//typeid(std::decay_t<T>))
 			return nullptr;
 
 		User_data::Holder<T>* val =
