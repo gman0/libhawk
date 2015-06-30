@@ -78,7 +78,7 @@ void Type_factory::register_type(size_t type,
 	m_types[type] = tp;
 }
 
-Type_factory::Handler Type_factory::get_handler(size_t type)
+Type_factory::Handler Type_factory::get_handler(size_t type) const
 {
 	auto it = std::find_if(m_types.begin(), m_types.end(),
 		[type](const Type_map::value_type& v) {
@@ -100,17 +100,17 @@ Type_factory::Handler Type_factory::get_handler(size_t type)
 	return it->second;
 }
 
-Type_factory::Handler Type_factory::get_handler(const Path& p)
+Type_factory::Handler Type_factory::get_handler(const Path& p) const
 {
 	return get_handler(get_hash_type(p));
 }
 
-const char* Type_factory::get_mime(const Path& p)
+const char* Type_factory::get_mime(const Path& p) const
 {
 	return magic_file(m_magic_guard->magic_cookie, p.c_str());
 }
 
-size_t Type_factory::get_hash_type(const Path& p)
+size_t Type_factory::get_hash_type(const Path& p) const
 {
 	static std::string mime;
 	const char* m = get_mime(p);

@@ -47,11 +47,11 @@ namespace hawk {
 		void register_type(size_t type, const Handler& tp);
 
 		// Returns a handler for supplied hash or deduced file type.
-		Handler get_handler(size_t type);
-		Handler get_handler(const Path& p);
+		Handler get_handler(size_t type) const;
+		Handler get_handler(const Path& p) const;
 
-		const char* get_mime(const Path& p);
-		size_t get_hash_type(const Path& p);
+		const char* get_mime(const Path& p) const;
+		size_t get_hash_type(const Path& p) const;
 	};
 }
 
