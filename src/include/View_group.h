@@ -83,8 +83,8 @@ namespace hawk {
 		std::chrono::time_point<
 			std::chrono::steady_clock> m_preview_timestamp;
 
-		Type_factory* m_type_factory;
-		Type_factory::Handler m_list_dir_closure; // don't need this
+		const Type_factory& m_type_factory;
+		Type_factory::Handler m_list_dir_closure;
 
 		Interruptible_thread m_tasking_thread;
 		struct Tasking
@@ -97,7 +97,7 @@ namespace hawk {
 
 			Exception_handler exception_handler;
 
-			Tasking(Exception_handler& eh)
+			Tasking(Exception_handler&& eh)
 				:
 				  ready_for_tasking{true},
 				  global{false},
@@ -111,8 +111,9 @@ namespace hawk {
 
 	public:
 		View_group(
-				const Path& p, Exception_handler& eh, int nviews,
-				Type_factory* tf, const Type_factory::Handler& list_dir_closure,
+				const Path& p, int nviews, const Type_factory& tf,
+				const Exception_handler& eh,
+				const Type_factory::Handler& list_dir_closure,
 				std::chrono::milliseconds preview_delay)
 			:
 			  m_path{p},

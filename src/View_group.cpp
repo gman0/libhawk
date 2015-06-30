@@ -275,7 +275,7 @@ void View_group::create_preview(const Path& p)
 
 void View_group::task_create_preview(const Path& p)
 {
-	auto handler = m_type_factory->get_handler(p);
+	auto handler = m_type_factory.get_handler(p);
 	if (!handler) return;
 
 	m_preview.reset(handler());
