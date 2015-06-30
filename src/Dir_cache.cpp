@@ -423,7 +423,7 @@ static void fs_watchdog()
 	}
 }
 
-void _start_filesystem_watchdog(On_fs_change&& on_fs_change,
+void start_filesystem_watchdog(On_fs_change&& on_fs_change,
 							   On_sort_change&& on_sort_change,
 							   Populate_user_data&& populate)
 {
