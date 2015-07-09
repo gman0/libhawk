@@ -36,8 +36,7 @@ namespace hawk {
 		Path() : m_hash{0} {}
 
 		template <typename Path_, typename = enable_if_not_self<Path_, Path>>
-		Path(Path_&& p, size_t hash = 0)
-			: m_hash{hash}, m_path{std::forward<Path_>(p)}
+		Path(Path_&& p) : m_hash{0}, m_path{std::forward<Path_>(p)}
 		{}
 
 		template <typename Path_, typename = enable_if_not_self<Path_, Path>>
@@ -50,7 +49,7 @@ namespace hawk {
 		}
 
 		Path(const char* p, std::string::size_type count)
-			: m_hash{0}, m_path{p, (count + 1)}
+			: m_hash{0}, m_path{p, count}
 		{}
 
 		void clear();
@@ -91,7 +90,7 @@ namespace hawk {
 		bool is_absolute() const;
 
 		// Even though this method is marked as const it
-		// can change the value of m_hash.
+		// may change the value of m_hash.
 		size_t hash() const;
 
 	private:

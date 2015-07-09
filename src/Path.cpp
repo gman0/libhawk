@@ -59,6 +59,7 @@ bool Path::string_equals(const Path& p) const
 
 Path& Path::operator/=(const Path& p)
 {
+	m_hash = 0;
 	if (p.empty())
 		return *this;
 
@@ -167,10 +168,10 @@ void Path::set_parent_path()
 			if (m_path[1] == '\0')
 				m_path.clear();
 			else
-				m_path[1] = '\0';
+				m_path = "/";
 		}
 		else
-			m_path[pos] = '\0';
+			m_path = m_path.substr(0, pos);
 	}
 
 	m_hash = 0;
@@ -183,19 +184,19 @@ Path Path::filename() const
 	if (pos == std::string::npos || pos == 1)
 		return *this;
 
-	return Path(m_path.c_str() + pos + 1,
-				m_path.length() - pos - 2);
+	return Path{m_path.c_str() + pos + 1,
+				m_path.length() - pos - 1};
 }
 
 void Path::set_filename()
 {
 	auto pos = m_path.rfind('/');
+	m_hash = 0;
 
 	if (pos == std::string::npos || pos == 1)
 		return;
 
-	m_path = m_path.substr(pos - 1, m_path.length());
-	m_hash = 0;
+	m_path = m_path.substr(pos + 1);
 }
 
 bool Path::is_absolute() const
