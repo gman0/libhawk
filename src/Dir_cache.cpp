@@ -340,20 +340,14 @@ static void sort_dir(Dir_vector& v)
 {
 	if (s_state.sort_pred)
 	{
-		if (v.size() < sort_granularity)
-			parallel_sort(0, v.size(), v);
-		else
-			parallel_sort(0, sort_granularity, v);
+		parallel_sort(0, v.size(), v);
 	}
 }
 
 void populate_user_data(const Path& base, Dir_entry& ent)
 {
 	if (s_state.populate_user_data)
-	{
-		assert(!ent.user_data.empty() && "No User_data type specified");
 		s_state.populate_user_data({base / ent.path}, ent.user_data);
-	}
 }
 
 // Gather contents of a directory and move them to the out vector
