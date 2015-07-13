@@ -130,7 +130,7 @@ namespace hawk {
 	template <typename T>
 	T* user_data_cast(const User_data* ud) noexcept
 	{
-		if (ud->type() != typeid(T))//typeid(std::decay_t<T>))
+		if (ud->type() != typeid(std::decay_t<T>))
 			return nullptr;
 
 		User_data::Holder<T>* val =
