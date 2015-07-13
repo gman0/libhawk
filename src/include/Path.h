@@ -52,6 +52,11 @@ namespace hawk {
 			: m_hash{0}, m_path{p, count}
 		{}
 
+		Path(const std::string& str, std::string::size_type pos,
+			 std::string::size_type count)
+			: m_hash{0}, m_path{str, pos, count}
+		{}
+
 		void clear();
 		bool empty() const;
 

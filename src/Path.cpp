@@ -152,7 +152,7 @@ Path Path::parent_path() const
 	if (pos == std::string::npos) return Path {};
 	if (pos == 0) return (m_path[1] == '\0') ? Path {} : Path {"/"};
 
-	return Path {m_path.c_str(), --pos};
+	return Path {m_path.c_str(), pos};
 }
 
 void Path::set_parent_path()
