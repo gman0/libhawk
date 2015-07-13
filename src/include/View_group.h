@@ -84,7 +84,6 @@ namespace hawk {
 			std::chrono::steady_clock> m_preview_timestamp;
 
 		const Type_factory& m_type_factory;
-		Type_factory::Handler m_list_dir_closure;
 
 		Interruptible_thread m_tasking_thread;
 		struct Tasking
@@ -110,19 +109,25 @@ namespace hawk {
 		} m_tasking;
 
 	public:
+
+		// secondary_list_dir is used for all nviews views and
+		// primary_list_dir is used for the last (nviews+1)-th view.
+		// Note that both primary_list_dir and secondary_list_dir
+		// may be null - in that case the List_dir handler registered
+		// in Type_factory will be used.
 		View_group(
 				const Path& p, int nviews, const Type_factory& tf,
 				const Exception_handler& eh,
-				const Type_factory::Handler& list_dir_closure,
+				const Type_factory::Handler& primary_list_dir,
+				const Type_factory::Handler& secondary_list_dir,
 				std::chrono::milliseconds preview_delay)
 			:
 			  m_path{p},
 			  m_preview_delay{preview_delay},
 			  m_type_factory{tf},
-			  m_list_dir_closure{list_dir_closure},
 			  m_tasking{eh}
 		{
-			build_views(--nviews);
+			build_views(--nviews, primary_list_dir, secondary_list_dir);
 			m_tasking_thread = Interruptible_thread {std::ref(m_tasking)};
 		}
 
@@ -146,8 +151,11 @@ namespace hawk {
 					List_dir::Cursor_search_direction::begin);
 
 	private:
-		void build_views(int nviews);
-		void instantiate_views(int nviews);
+		void build_views(int nviews, const Type_factory::Handler& primary_ld,
+						 const Type_factory::Handler& secondary_list_dir);
+		void instantiate_views(
+				int nviews, const Type_factory::Handler& primary_ld,
+				const Type_factory::Handler& secondary_list_dir);
 		void initialize_views(int nviews);
 
 		void update_paths(Path path);

@@ -25,6 +25,7 @@
 #include "View_group.h"
 #include "View.h"
 #include "handlers/List_dir.h"
+#include "handlers/List_dir_hash.h"
 #include "Dir_cache.h"
 #include "Interruptible_thread.h"
 #include "Interrupt.h"
@@ -180,21 +181,41 @@ void View_group::set_cursor(const Path& filename,
 	}
 }
 
-void View_group::build_views(int nviews)
+void View_group::build_views(
+		int nviews, const Type_factory::Handler& primary_ld,
+		const Type_factory::Handler& secondary_ld)
 {
-	instantiate_views(nviews);
+	instantiate_views(nviews, primary_ld, secondary_ld);
 	initialize_views(nviews);
 
 	update_active_cursor();
 }
 
-void View_group::instantiate_views(int nviews)
+void View_group::instantiate_views(
+		int nviews, const Type_factory::Handler& primary_ld,
+		const Type_factory::Handler& secondary_ld)
 {
-	add_view(m_list_dir_closure);
-	for (int i = 1; i <= nviews; i++)
+	auto ld = m_type_factory.get_handler(hash_list_dir());
+	assert(ld != nullptr && "No hawk::List_dir handler registered");
+
+	if (nviews > 0)
 	{
-		add_view(m_list_dir_closure);
-		m_views[i - 1]->_set_next_view(m_views[i].get());
+		if (secondary_ld) ld = secondary_ld;
+
+		add_view(ld);
+		for (int i = 1; i < nviews; i++)
+		{
+			add_view(ld);
+			m_views[i - 1]->_set_next_view(m_views[i].get());
+		}
+	}
+
+	if (primary_ld) ld = primary_ld;
+
+	add_view(ld);
+	if (nviews > 0)
+	{
+		m_views[nviews - 1]->_set_next_view(m_views[nviews].get());
 	}
 }
 
@@ -295,7 +316,7 @@ void View_group::destroy_preview()
 }
 
 void View_group::Tasking::run_task(std::unique_lock<std::mutex>& lk,
-							std::function<void()>&& f)
+								   std::function<void()>&& f)
 {
 	cv.wait(lk, [this]{ return ready_for_tasking; });
 
