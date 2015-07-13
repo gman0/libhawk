@@ -31,7 +31,7 @@
 #include <atomic>
 #include <chrono>
 #include "Path.h"
-#include "Type_factory.h"
+#include "View_types.h"
 #include "Dir_cache.h"
 #include "Interruptible_thread.h"
 #include "handlers/List_dir.h"
@@ -83,7 +83,7 @@ namespace hawk {
 		std::chrono::time_point<
 			std::chrono::steady_clock> m_preview_timestamp;
 
-		const Type_factory& m_type_factory;
+		const View_types& m_view_types;
 
 		Interruptible_thread m_tasking_thread;
 		struct Tasking
@@ -116,15 +116,15 @@ namespace hawk {
 		// may be null - in that case the List_dir handler registered
 		// in Type_factory will be used.
 		View_group(
-				const Path& p, int nviews, const Type_factory& tf,
+				const Path& p, int nviews, const View_types& vt,
 				const Exception_handler& eh,
-				const Type_factory::Handler& primary_list_dir,
-				const Type_factory::Handler& secondary_list_dir,
+				const View_types::Handler& primary_list_dir,
+				const View_types::Handler& secondary_list_dir,
 				std::chrono::milliseconds preview_delay)
 			:
 			  m_path{p},
 			  m_preview_delay{preview_delay},
-			  m_type_factory{tf},
+			  m_view_types{vt},
 			  m_tasking{eh}
 		{
 			build_views(--nviews, primary_list_dir, secondary_list_dir);
@@ -151,11 +151,11 @@ namespace hawk {
 					List_dir::Cursor_search_direction::begin);
 
 	private:
-		void build_views(int nviews, const Type_factory::Handler& primary_ld,
-						 const Type_factory::Handler& secondary_list_dir);
+		void build_views(int nviews, const View_types::Handler& primary_ld,
+						 const View_types::Handler& secondary_ld);
 		void instantiate_views(
-				int nviews, const Type_factory::Handler& primary_ld,
-				const Type_factory::Handler& secondary_list_dir);
+				int nviews, const View_types::Handler& primary_ld,
+				const View_types::Handler& secondary_ld);
 		void initialize_views(int nviews);
 
 		void update_paths(Path path);
@@ -164,7 +164,7 @@ namespace hawk {
 		// the cursor can be safely set.
 		bool can_set_cursor();
 
-		void add_view(const Type_factory::Handler& closure);
+		void add_view(const View_types::Handler& closure);
 		// Sets view's path and calls its ready().
 		void ready_view(View& v, const Path& path);
 

@@ -182,8 +182,8 @@ void View_group::set_cursor(const Path& filename,
 }
 
 void View_group::build_views(
-		int nviews, const Type_factory::Handler& primary_ld,
-		const Type_factory::Handler& secondary_ld)
+		int nviews, const View_types::Handler& primary_ld,
+		const View_types::Handler& secondary_ld)
 {
 	instantiate_views(nviews, primary_ld, secondary_ld);
 	initialize_views(nviews);
@@ -192,10 +192,10 @@ void View_group::build_views(
 }
 
 void View_group::instantiate_views(
-		int nviews, const Type_factory::Handler& primary_ld,
-		const Type_factory::Handler& secondary_ld)
+		int nviews, const View_types::Handler& primary_ld,
+		const View_types::Handler& secondary_ld)
 {
-	auto ld = m_type_factory.get_handler(hash_list_dir());
+	auto ld = m_view_types.get_handler(hash_list_dir());
 	assert(ld != nullptr && "No hawk::List_dir handler registered");
 
 	if (nviews > 0)
@@ -240,7 +240,7 @@ void View_group::update_paths(Path p)
 	}
 }
 
-void View_group::add_view(const Type_factory::Handler& closure)
+void View_group::add_view(const View_types::Handler& closure)
 {
 	m_views.emplace_back(static_cast<List_dir*>(closure()));
 }
@@ -296,7 +296,7 @@ void View_group::create_preview(const Path& p)
 
 void View_group::task_create_preview(const Path& p)
 {
-	auto handler = m_type_factory.get_handler(p);
+	auto handler = m_view_types.get_handler(p);
 	if (!handler) return;
 
 	m_preview.reset(handler());

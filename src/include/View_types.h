@@ -17,8 +17,8 @@
 	along with libhawk.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef HAWK_TYPE_FACTORY_H
-#define HAWK_TYPE_FACTORY_H
+#ifndef HAWK_VIEW_TYPES_H
+#define HAWK_VIEW_TYPES_H
 
 #include <unordered_map>
 #include <functional>
@@ -30,8 +30,7 @@
 namespace hawk {
 	struct Magic_guard;
 
-	class Type_factory
-	{
+	class View_types{
 	public:
 		using Handler = std::function<View*()>;
 
@@ -40,9 +39,9 @@ namespace hawk {
 		std::unordered_map<size_t, Handler> m_types;
 
 	public:
-		Type_factory();
-		~Type_factory();
-		Type_factory(const Type_factory&) = delete;
+		View_types();
+		~View_types();
+		View_types(const View_types&) = delete;
 
 		void register_type(size_t type, const Handler& tp);
 
@@ -55,4 +54,4 @@ namespace hawk {
 	};
 }
 
-#endif // HAWK_TYPE_FACTORY_H
+#endif // HAWK_VIEW_TYPES_H

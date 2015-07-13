@@ -20,14 +20,14 @@
 #include <algorithm>
 #include <exception>
 #include <magic.h>
-#include "Type_factory.h"
+#include "View_types.h"
 #include "calchash.h"
 
 constexpr int half_size_t = sizeof(size_t) * 4;
 
 namespace hawk {
 
-using Type_map = std::unordered_map<size_t, Type_factory::Handler>;
+using Type_map = std::unordered_map<size_t, View_types::Handler>;
 
 struct Magic_guard
 {
@@ -56,7 +56,7 @@ static bool find_predicate(const Type_map::value_type& v,
 			& (find >> half_size_t));
 }
 
-Type_factory::Type_factory()
+View_types::View_types()
 	: m_magic_guard{new Magic_guard}
 {
 	if (!m_magic_guard->magic_cookie)
@@ -67,18 +67,18 @@ Type_factory::Type_factory()
 	}
 }
 
-Type_factory::~Type_factory()
+View_types::~View_types()
 {
 	delete m_magic_guard;
 }
 
-void Type_factory::register_type(size_t type,
-	const Type_factory::Handler& tp)
+void View_types::register_type(size_t type,
+	const View_types::Handler& tp)
 {
 	m_types[type] = tp;
 }
 
-Type_factory::Handler Type_factory::get_handler(size_t type) const
+View_types::Handler View_types::get_handler(size_t type) const
 {
 	auto it = std::find_if(m_types.begin(), m_types.end(),
 		[type](const Type_map::value_type& v) {
@@ -100,17 +100,17 @@ Type_factory::Handler Type_factory::get_handler(size_t type) const
 	return it->second;
 }
 
-Type_factory::Handler Type_factory::get_handler(const Path& p) const
+View_types::Handler View_types::get_handler(const Path& p) const
 {
 	return get_handler(get_hash_type(p));
 }
 
-const char* Type_factory::get_mime(const Path& p) const
+const char* View_types::get_mime(const Path& p) const
 {
 	return magic_file(m_magic_guard->magic_cookie, p.c_str());
 }
 
-size_t Type_factory::get_hash_type(const Path& p) const
+size_t View_types::get_hash_type(const Path& p) const
 {
 	static std::string mime;
 	const char* m = get_mime(p);
