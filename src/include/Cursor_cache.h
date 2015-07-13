@@ -21,27 +21,26 @@
 #define HAWK_CURSOR_CACHE_H
 
 #include <unordered_map>
+#include <shared_mutex>
 
 namespace hawk {
 	class Cursor_cache
 	{
-	public:
+	private:
+		mutable std::shared_timed_mutex m_sm;
+
 		// The first size_t is the hash of the path to which
 		// the cursor belongs to (key) and the second size_t
 		// is the item in the directory to which the cursor
 		// points to.
-		using Map = std::unordered_map<size_t, size_t>;
-		using Cursor = Map::iterator;
-
-	private:
-		Map m_cursor_map;
+		std::unordered_map<size_t, size_t> m_cursor_map;
 
 	public:
-		// Tries to find a cursor with key cursor_hash.
-		// Returns true on success (that is result != m_cursor_map.end()).
-		// The resulting find iterator is stored in iter.
-		bool find(size_t cursor_hash, Cursor& iter);
 		void store(size_t key, size_t cursor_hash);
+
+		// Tries to find a cursor with specified key.
+		// Returns a non-zero value on success.
+		size_t find(size_t key) const;
 	};
 }
 

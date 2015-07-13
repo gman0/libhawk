@@ -21,15 +21,18 @@
 
 namespace hawk {
 
-bool Cursor_cache::find(size_t cursor_hash, Cursor_cache::Cursor& iter)
-{
-	iter = m_cursor_map.find(cursor_hash);
-	return (iter != m_cursor_map.end());
-}
-
 void Cursor_cache::store(size_t key, size_t cursor_hash)
 {
+	std::lock_guard<std::shared_timed_mutex> lk {m_sm};
 	m_cursor_map[key] = cursor_hash;
+}
+
+size_t Cursor_cache::find(size_t key) const
+{
+	std::shared_lock<std::shared_timed_mutex> lk {m_sm};
+
+	auto iter = m_cursor_map.find(key);
+	return (iter != m_cursor_map.end()) ? iter->second : 0;
 }
 
 } // namespace hawk
