@@ -29,6 +29,8 @@
 
 namespace hawk {
 
+namespace {
+
 size_t dirent_buf_size()
 {
 	long name_max;
@@ -54,6 +56,8 @@ size_t dirent_buf_size()
 	return (name_end > sizeof(struct dirent)
 			? name_end : sizeof(struct dirent));
 }
+
+} // unnamed-namespace
 
 Directory_iterator::Directory_iterator(const Path& p)
 {

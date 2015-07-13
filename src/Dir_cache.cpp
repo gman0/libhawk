@@ -33,6 +33,8 @@
 
 namespace hawk {
 
+namespace {
+
 struct Cache_entry
 {
 	std::atomic<bool> dirty;
@@ -53,7 +55,7 @@ struct Cache_entry
 };
 
 // Don't waste space.
-static void shrink(Dir_ptr& ptr)
+void shrink(Dir_ptr& ptr)
 {
 	constexpr unsigned max_size = 1024;
 
@@ -61,9 +63,12 @@ static void shrink(Dir_ptr& ptr)
 		ptr->resize(max_size);
 }
 
-static bool is_free(const Cache_entry& ent) { return ent.path.empty(); }
+bool is_free(const Cache_entry& ent)
+{
+	return ent.path.empty();
+}
 
-static void free_ptr(Cache_entry& ent)
+void free_ptr(Cache_entry& ent)
 {
 	ent.path.clear();
 	shrink(ent.ptr);
@@ -291,7 +296,7 @@ struct Filesystem_watchdog
 	}
 };
 
-static struct
+struct
 {
 	Cache_list entries;
 	Filesystem_watchdog fs_watchdog;
@@ -304,7 +309,7 @@ static struct
 
 constexpr int sort_granularity = 10000;
 
-static void parallel_sort(size_t beg, size_t end, Dir_vector& vec)
+void parallel_sort(size_t beg, size_t end, Dir_vector& vec)
 {
 	Dir_vector::iterator start_it = vec.begin();
 
@@ -336,7 +341,7 @@ static void parallel_sort(size_t beg, size_t end, Dir_vector& vec)
 	}
 }
 
-static void sort_dir(Dir_vector& v)
+void sort_dir(Dir_vector& v)
 {
 	if (s_state.sort_pred)
 	{
@@ -344,14 +349,8 @@ static void sort_dir(Dir_vector& v)
 	}
 }
 
-void populate_user_data(const Path& base, Dir_entry& ent)
-{
-	if (s_state.populate_user_data)
-		s_state.populate_user_data({base / ent.path}, ent.user_data);
-}
-
 // Gather contents of a directory and move them to the out vector
-static void gather_dir_contents(const Path& p, Dir_vector& out)
+void gather_dir_contents(const Path& p, Dir_vector& out)
 {
 	Directory_iterator dir_it_end;
 	for (auto dir_it = Directory_iterator {p};
@@ -371,8 +370,8 @@ static void gather_dir_contents(const Path& p, Dir_vector& out)
 }
 
 // Marks a Dir_ptr as dirty if its timestamp is outdated.
-static void mark_outdated_ptr_dirty(Cache_entry& ent,
-									std::vector<size_t>& hash_vec)
+void mark_outdated_ptr_dirty(
+		Cache_entry& ent, std::vector<size_t>& hash_vec)
 {
 	if (!exists(ent.path))
 	{
@@ -392,7 +391,7 @@ static void mark_outdated_ptr_dirty(Cache_entry& ent,
 	}
 }
 
-static void fs_watchdog()
+void fs_watchdog()
 {
 	std::vector<size_t> hash_vec;
 
@@ -415,6 +414,35 @@ static void fs_watchdog()
 		else
 			break;
 	}
+}
+
+void build_cache_entry(Cache_entry& ent, const Path& p,
+					   std::shared_ptr<Dir_vector>&& ptr)
+{
+	ent.dirty = false;
+	ent.timestamp = last_write_time(p);
+	ent.path = p;
+	ent.ptr = std::move(ptr);
+
+	gather_dir_contents(p, *ent.ptr);
+}
+
+void rebuild_cache_entry(Cache_entry& ent)
+{
+	ent.dirty = false;
+	ent.timestamp = last_write_time(ent.path);
+	ent.ptr->clear();
+
+	gather_dir_contents(ent.path, *ent.ptr);
+}
+
+} // unnamed-namespace
+
+
+void populate_user_data(const Path& base, Dir_entry& ent)
+{
+	if (s_state.populate_user_data)
+		s_state.populate_user_data({base / ent.path}, ent.user_data);
 }
 
 void start_filesystem_watchdog(On_fs_change&& on_fs_change,
@@ -446,26 +474,6 @@ void set_sort_predicate(Dir_sort_predicate&& pred)
 Dir_sort_predicate get_sort_predicate()
 {
 	return s_state.sort_pred;
-}
-
-static void build_cache_entry(Cache_entry& ent, const Path& p,
-							  std::shared_ptr<Dir_vector>&& ptr)
-{
-	ent.dirty = false;
-	ent.timestamp = last_write_time(p);
-	ent.path = p;
-	ent.ptr = std::move(ptr);
-
-	gather_dir_contents(p, *ent.ptr);
-}
-
-static void rebuild_cache_entry(Cache_entry& ent)
-{
-	ent.dirty = false;
-	ent.timestamp = last_write_time(ent.path);
-	ent.ptr->clear();
-
-	gather_dir_contents(ent.path, *ent.ptr);
 }
 
 void load_dir_ptr(Dir_ptr& ptr, const Path& p)

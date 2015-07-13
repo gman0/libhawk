@@ -23,8 +23,12 @@
 
 namespace hawk {
 
-static std::string type { "inode/directory" };
-static size_t hash = hawk::calculate_mime_hash(type);
+namespace {
+
+std::string type { "inode/directory" };
+size_t hash = hawk::calculate_mime_hash(type);
+
+} // unnamed-namespace
 
 size_t hash_list_dir()
 {

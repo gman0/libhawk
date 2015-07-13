@@ -31,8 +31,10 @@
 
 namespace hawk {
 
-static Dir_cursor match_cursor(Dir_vector& vec, size_t hash, Dir_cursor cur,
-							   List_dir::Cursor_search_direction dir)
+namespace {
+
+Dir_cursor match_cursor(Dir_vector& vec, size_t hash, Dir_cursor cur,
+						List_dir::Cursor_search_direction dir)
 {
 	using Dir = List_dir::Cursor_search_direction;
 	auto pred = [hash](const Dir_entry& ent){
@@ -52,7 +54,7 @@ static Dir_cursor match_cursor(Dir_vector& vec, size_t hash, Dir_cursor cur,
 	}
 }
 
-static List_dir::Cursor_search_direction determine_direction(
+List_dir::Cursor_search_direction determine_direction(
 		Dir_cursor cur, const Path& filename, const Path& base)
 {
 	Dir_entry ent;
@@ -64,7 +66,7 @@ static List_dir::Cursor_search_direction determine_direction(
 			  : List_dir::Cursor_search_direction::after;
 }
 
-static Dir_cursor match_directed_cursor(
+Dir_cursor match_directed_cursor(
 		const Path& filename, Dir_vector& vec,
 		Dir_cursor current_cur, List_dir::Cursor_search_direction dir,
 		const Path& base)
@@ -74,6 +76,8 @@ static Dir_cursor match_directed_cursor(
 
 	return match_cursor(vec, filename.hash(), current_cur, dir);
 }
+
+} // unnamed-namespace
 
 void List_dir::acquire_cursor()
 {
