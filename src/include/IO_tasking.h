@@ -42,10 +42,12 @@ namespace hawk {
 		std::chrono::seconds eta_end;
 	};
 
+	class IO_task;
+
 	using Task_progress_monitor =
-			std::function<void(const Task_progress&) noexcept>;
+			std::function<void(IO_task*, const Task_progress&) noexcept>;
 	using File_progress_monitor =
-			std::function<void(const File_progress&) noexcept>;
+			std::function<void(IO_task*, const File_progress&) noexcept>;
 
 	void set_io_task_callbacks(
 			Task_progress_monitor&& tmon, File_progress_monitor&& fmon);

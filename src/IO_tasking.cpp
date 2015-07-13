@@ -84,8 +84,8 @@ public:
 };
 
 void update_progress(
-		uintmax_t bytes_read, uintmax_t offset, uintmax_t total_size,
-		const Time_point& start, Time_point& last_update)
+		IO_task* parent, uintmax_t bytes_read, uintmax_t offset,
+		uintmax_t total_size, const Time_point& start, Time_point& last_update)
 {
 	auto now = std::chrono::steady_clock::now();
 	if (now - last_update > std::chrono::seconds {1})
@@ -101,14 +101,15 @@ void update_progress(
 		progress.eta_end =
 				(total_size - bytes_read) * time_elapsed / bytes_read;
 
-		s_monitor_callbacks.fmon(progress);
+		s_monitor_callbacks.fmon(parent, progress);
 		last_update = now;
 
 		hard_interruption_point();
 	}
 }
 
-void copy_file(IO_task::Context& ctx, const Path& src, const Path& dst)
+void copy_file(IO_task* parent, IO_task::Context& ctx,
+			   const Path& src, const Path& dst)
 {
 	// Prepare for copying.
 
@@ -168,7 +169,8 @@ void copy_file(IO_task::Context& ctx, const Path& src, const Path& dst)
 
 		bytes_read += read_sz;
 		ctx.offset += read_sz;
-		update_progress(bytes_read, ctx.offset, sz, ctx.start, last_update);
+		update_progress(parent, bytes_read, ctx.offset, sz,
+						ctx.start, last_update);
 	}
 }
 
@@ -402,7 +404,7 @@ void IO_task::may_fail(const Path& src, const Path& dst, int err) const
 
 void IO_task::dispatch_item(Item& i)
 {
-	s_monitor_callbacks.tmon(Task_progress {i.src, i.dst});
+	s_monitor_callbacks.tmon(this, Task_progress {i.src, i.dst});
 
 	Stat st = hawk::symlink_status(i.src);
 
@@ -415,7 +417,12 @@ void IO_task::dispatch_item(Item& i)
 	}
 
 	if (i.dst.empty())
-		i.dst = m_dst;
+	{
+		if (exists(m_dst) && is_directory(m_dst))
+			i.dst = m_dst / i.src.filename();
+		else
+			i.dst = m_dst;
+	}
 
 	if (is_regular_file(st))
 		process_file(i);
@@ -539,7 +546,7 @@ void IO_task_copy::traverse_directory(
 		Path dst = i.dst / p;
 		Stat st = symlink_status(src);
 
-		s_monitor_callbacks.tmon(Task_progress {src, dst});
+		s_monitor_callbacks.tmon(this, Task_progress {src, dst});
 
 		try {
 			if (is_symlink(st) && (
@@ -600,7 +607,7 @@ void IO_task_copy::process_directory(Item& i)
 
 void IO_task_copy::process_file(const Path& src, const Path& dst)
 {
-	copy_file(m_ctx, src, dst);
+	copy_file(this, m_ctx, src, dst);
 	copy_permissions(src, dst);
 }
 
@@ -657,7 +664,7 @@ void IO_task_move::traverse_directory(
 		Stat st = symlink_status(src);
 		m_prev_level = dir_iter.level();
 
-		s_monitor_callbacks.tmon(Task_progress {src, dst});
+		s_monitor_callbacks.tmon(this, Task_progress {src, dst});
 
 		// Increment the iterator.
 
@@ -797,7 +804,7 @@ void IO_task_move::process_file(const Path& src, const Path& dst)
 		rename_move(src, dst);
 	else
 	{
-		copy_file(m_ctx, src, dst);
+		copy_file(this, m_ctx, src, dst);
 		copy_permissions(src, dst);
 
 		if (unlink(src.c_str()) != 0)
@@ -880,7 +887,7 @@ void IO_task_remove::process_directory(IO_task::Item& i)
 		Stat st = symlink_status(p);
 		prev_level = it.level();
 
-		s_monitor_callbacks.tmon(Task_progress {p, Path()});
+		s_monitor_callbacks.tmon(this, Task_progress {p, Path()});
 
 		if (is_symlink(st))
 			it.orthogonal_increment(); // Don't iterate through symlinks.
