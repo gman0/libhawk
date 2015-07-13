@@ -42,22 +42,8 @@ namespace hawk {
 	protected:
 		Path m_path;
 
-		// Views form a linked-list-like structure. This pointer
-		// is used to set cursors properly.
-		const View* m_next_view;
-
 	public:
-		View() : m_next_view{nullptr} {}
 		virtual ~View() = default;
-
-		View(const View&) = delete;
-		View& operator=(const View&) = delete;
-
-		View(View&& v) noexcept;
-		View& operator=(View&& v) noexcept;
-
-		// For internal/expert use only.
-		void _set_next_view(const View* next_view);
 
 		const Path& get_path() const;
 		virtual void set_path(const Path& path);
@@ -67,12 +53,6 @@ namespace hawk {
 		// is called. Do your synchronization in here.
 		virtual void ready() noexcept = 0;
 		virtual void not_ready() noexcept = 0;
-
-	protected:
-		// Returns nullptr when m_next_view is nullptr.
-		// Otherwise pointer to path of the next view
-		// is returned.
-		const Path* get_next_path() const;
 	};
 }
 

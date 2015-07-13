@@ -27,6 +27,7 @@
 #include "handlers/List_dir.h"
 #include "handlers/List_dir_hash.h"
 #include "Dir_cache.h"
+#include "Cursor_cache.h"
 #include "Interruptible_thread.h"
 #include "Interrupt.h"
 #include "Filesystem.h"
@@ -136,6 +137,7 @@ void View_group::set_path(Path p)
 
 	std::unique_lock<std::mutex> lk {m_tasking.m};
 	m_tasking.run_task(lk, [&, p]{
+		update_cursors(p);
 		task_load_path(p);
 
 		std::lock_guard<std::shared_timed_mutex> lk {m_path_sm};
@@ -171,7 +173,7 @@ void View_group::set_cursor(Dir_cursor cursor)
 }
 
 void View_group::set_cursor(const Path& filename,
-					 List_dir::Cursor_search_direction dir)
+							List_dir::Cursor_search_direction dir)
 {
 	if (can_set_cursor())
 	{
@@ -201,31 +203,37 @@ void View_group::instantiate_views(
 	if (nviews > 0)
 	{
 		if (secondary_ld) ld = secondary_ld;
-
-		add_view(ld);
-		for (int i = 1; i < nviews; i++)
-		{
+		for (int i = 0; i < nviews; i++)
 			add_view(ld);
-			m_views[i - 1]->_set_next_view(m_views[i].get());
-		}
 	}
 
 	if (primary_ld) ld = primary_ld;
-
 	add_view(ld);
-	if (nviews > 0)
-	{
-		m_views[nviews - 1]->_set_next_view(m_views[nviews].get());
-	}
 }
 
 void View_group::initialize_views(int nviews)
 {
+	update_cursors(m_path);
+
 	Path p = m_path;
 	std::vector<Path> paths = dissect_path(p, nviews);
 
 	for (; nviews >= 0; nviews--)
 		ready_view(*m_views[nviews], paths[nviews]);
+}
+
+void View_group::update_cursors(Path path)
+{
+	Path filename = path.filename();
+	path.set_parent_path();
+
+	while (!filename.empty() && !path.empty())
+	{
+		m_cursor_cache.store(path.hash(), filename.hash());
+
+		filename = path.filename();
+		path.set_parent_path();
+	}
 }
 
 void View_group::update_paths(Path p)

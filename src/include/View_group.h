@@ -84,6 +84,7 @@ namespace hawk {
 			std::chrono::steady_clock> m_preview_timestamp;
 
 		const View_types& m_view_types;
+		Cursor_cache& m_cursor_cache;
 
 		Interruptible_thread m_tasking_thread;
 		struct Tasking
@@ -117,7 +118,7 @@ namespace hawk {
 		// in Type_factory will be used.
 		View_group(
 				const Path& p, int nviews, const View_types& vt,
-				const Exception_handler& eh,
+				Cursor_cache& cc, const Exception_handler& eh,
 				const View_types::Handler& primary_list_dir,
 				const View_types::Handler& secondary_list_dir,
 				std::chrono::milliseconds preview_delay)
@@ -125,6 +126,7 @@ namespace hawk {
 			  m_path{p},
 			  m_preview_delay{preview_delay},
 			  m_view_types{vt},
+			  m_cursor_cache{cc},
 			  m_tasking{eh}
 		{
 			build_views(--nviews, primary_list_dir, secondary_list_dir);
@@ -157,6 +159,8 @@ namespace hawk {
 				int nviews, const View_types::Handler& primary_ld,
 				const View_types::Handler& secondary_ld);
 		void initialize_views(int nviews);
+
+		void update_cursors(Path path);
 
 		void update_paths(Path path);
 		void update_active_cursor();

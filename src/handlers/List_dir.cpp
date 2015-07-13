@@ -48,7 +48,7 @@ static Dir_cursor match_cursor(Dir_vector& vec, size_t hash, Dir_cursor cur,
 							 vec.rend(), pred) + 1).base();
 	case Dir::after:
 		return std::find_if(cur, vec.end(), pred);
-	default: return Dir_cursor {};
+	default: return vec.end();
 	}
 }
 
@@ -77,19 +77,11 @@ static Dir_cursor match_directed_cursor(
 
 void List_dir::acquire_cursor()
 {
-	if (m_next_view)
+	if (size_t cursor_hash = m_cursor_cache.find(m_path.hash()))
 	{
-		set_cursor(get_next_path()->filename(), Cursor_search_direction::begin);
-		return;
-	}
-
-	Cursor_cache::Cursor cursor;
-	if (m_cursor_cache->find(m_path.hash(), cursor))
-	{
-		// Ok, so we DID find the hash of the cursor,
-		// now let's assign it to the correct Dir_vector
-		// item if we can.
-		m_cursor = match_cursor(*m_dir_ptr, cursor->second, Dir_cursor{},
+		// We found the hash of the cursor, now let's assign
+		// it to the correct Dir_vector item if we can.
+		m_cursor = match_cursor(*m_dir_ptr, cursor_hash, Dir_cursor{},
 								Cursor_search_direction::begin);
 
 		if (m_cursor != m_dir_ptr->end())
@@ -109,7 +101,7 @@ void List_dir::set_cursor(Dir_cursor cursor)
 	if (m_dir_ptr->empty())
 		return;
 
-	m_cursor_cache->store(m_path.hash(), m_cursor->path.hash());
+	m_cursor_cache.store(m_path.hash(), m_cursor->path.hash());
 }
 
 void List_dir::set_cursor(const Path& filename, Cursor_search_direction dir)

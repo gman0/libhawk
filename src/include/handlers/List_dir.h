@@ -43,14 +43,14 @@ namespace hawk {
 		};
 
 	private:
-		Cursor_cache* m_cursor_cache;
+		Cursor_cache& m_cursor_cache;
 
 	protected:
 		Dir_ptr m_dir_ptr;
 		Dir_cursor m_cursor;
 
 	public:
-		List_dir(Cursor_cache* cc)
+		List_dir(Cursor_cache& cc)
 			: m_cursor_cache{cc}
 		{}
 

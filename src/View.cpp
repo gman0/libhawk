@@ -24,40 +24,9 @@
 
 namespace hawk {
 
-View::View(View&& v) noexcept
-	:
-	  m_path{std::move(v.m_path)},
-	  m_next_view{v.m_next_view}
-{
-	v.m_next_view = nullptr;
-}
-
-View& View::operator=(View&& v) noexcept
-{
-	if (&v == this)
-		return *this;
-
-	m_path = std::move(v.m_path);
-	m_next_view = v.m_next_view;
-
-	v.m_next_view = nullptr;
-
-	return *this;
-}
-
-void View::_set_next_view(const View* next_view)
-{
-	m_next_view = next_view;
-}
-
 const Path& View::get_path() const
 {
 	return m_path;
-}
-
-const Path* View::get_next_path() const
-{
-	return m_next_view ? &m_next_view->get_path() : nullptr;
 }
 
 void View::set_path(const Path& p)
