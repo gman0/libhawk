@@ -146,6 +146,11 @@ namespace hawk {
 
 		const List_dir_vector& get_views() const;
 
+		// Warning: the View pointed to by the returned pointer
+		//          gets deleted every time set_path/reload_path
+		//          or set_cursor is called!
+		const View* get_preview() const;
+
 		void set_cursor(Dir_cursor cursor);
 		// See handlers/List_dir.h for Cursor_search_direction
 		void set_cursor(const Path& filename,

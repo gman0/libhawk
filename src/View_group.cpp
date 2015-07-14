@@ -163,6 +163,11 @@ const View_group::List_dir_vector& View_group::get_views() const
 	return m_views;
 }
 
+const View*View_group::get_preview() const
+{
+	return m_preview.get();
+}
+
 void View_group::set_cursor(Dir_cursor cursor)
 {
 	if (can_set_cursor(m_tasking.global.load(std::memory_order_acquire)))
