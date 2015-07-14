@@ -24,6 +24,7 @@
 #include <functional>
 #include <vector>
 #include <utility>
+#include <mutex>
 #include "Path.h"
 #include "View.h"
 
@@ -35,21 +36,25 @@ namespace hawk {
 		using Handler = std::function<View*()>;
 
 	private:
+		mutable std::mutex m_mtx;
+
 		Magic_guard* m_magic_guard;
 		std::unordered_map<size_t, Handler> m_types;
 
 	public:
 		View_types();
 		~View_types();
+
 		View_types(const View_types&) = delete;
 
+		// (not thread-safe)
 		void register_type(size_t type, const Handler& tp);
 
 		// Returns a handler for supplied hash or deduced file type.
 		Handler get_handler(size_t type) const;
 		Handler get_handler(const Path& p) const;
 
-		const char* get_mime(const Path& p) const;
+		std::string get_mime(const Path& p) const;
 		size_t get_hash_type(const Path& p) const;
 	};
 }

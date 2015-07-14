@@ -35,10 +35,8 @@ struct Magic_guard
 
 	Magic_guard()
 	{
-		magic_cookie =
-				magic_open(MAGIC_MIME_TYPE
-						   | MAGIC_SYMLINK
-						   | MAGIC_NO_CHECK_TOKENS);
+		magic_cookie = magic_open(
+				MAGIC_MIME_TYPE | MAGIC_SYMLINK);
 		magic_load(magic_cookie, nullptr);
 	}
 
@@ -48,10 +46,9 @@ struct Magic_guard
 	}
 };
 
-static bool find_predicate(const Type_map::value_type& v,
-		size_t find)
+static bool find_predicate(
+		const Type_map::value_type& v, size_t find)
 {
-	constexpr int half_size_t = sizeof(size_t) * 4;
 	return (v.first >> half_size_t) == ((v.first >> half_size_t)
 			& (find >> half_size_t));
 }
@@ -105,22 +102,17 @@ View_types::Handler View_types::get_handler(const Path& p) const
 	return get_handler(get_hash_type(p));
 }
 
-const char* View_types::get_mime(const Path& p) const
+std::string View_types::get_mime(const Path& p) const
 {
-	return magic_file(m_magic_guard->magic_cookie, p.c_str());
+	std::lock_guard<std::mutex> lk {m_mtx};
+	const char* m = magic_file(m_magic_guard->magic_cookie, p.c_str());
+	return m ? m : std::string {};
 }
 
 size_t View_types::get_hash_type(const Path& p) const
 {
-	static std::string mime;
-	const char* m = get_mime(p);
-
-	if (m == nullptr)
-		return 0;
-
-	mime = m;
-
-	return calculate_mime_hash(mime);
+	std::string mime = get_mime(p);
+	return (mime.empty()) ? 0 : calculate_mime_hash(mime);
 }
 
 } //namespace hawk
