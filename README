@@ -33,22 +33,15 @@ Both a shared library libhawk.so and a static library libhawk_static.a will
 be created.
 
 
-How do I run libhawk?
----------------------
-You don't. As it's stated in the description, this is a library - it's not
-capable of running as a standalone program. That's what a hawk front-end
-is for (ie. hawk-gtk3).
-
-
 Usage
 -----
-Refer to the API reference manual and hawk-gtk3.
+Refer to the API reference manual and hawk-test.
 
 
 Links
 -----
-libhawk git repo: https://github.com/gman0/libhawk.git
-hawk-gtk3 git repo: https://github.com/gman0/hawk-gtk3.git
+libhawk git: https://github.com/gman0/libhawk.git
+hawk-test git: https://github.com/gman0/hawk-test.git
 
 
 Contact
