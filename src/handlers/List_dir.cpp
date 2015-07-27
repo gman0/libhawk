@@ -98,6 +98,11 @@ void List_dir::acquire_cursor()
 	m_cursor = m_dir_ptr->begin();
 }
 
+void List_dir::update_cursor_cache()
+{
+	m_cursor_cache.store(m_path.hash(), m_cursor->path.hash());
+}
+
 void List_dir::set_cursor(Dir_cursor cursor)
 {
 	m_cursor = cursor;
@@ -117,6 +122,39 @@ void List_dir::set_cursor(const Path& filename, Cursor_search_direction dir)
 		set_cursor(cursor);
 	else
 		set_cursor(m_dir_ptr->begin());
+}
+
+void List_dir::advance_cursor(Dir_vector::difference_type d)
+{
+	if (!m_dir_ptr || m_dir_ptr->empty()) return;
+
+	if (d > 0)
+	{
+		auto dist = std::distance(m_cursor, m_dir_ptr->end()) - 1;
+		if (dist < d)
+			d = dist;
+	}
+	else
+	{
+		auto dist = std::distance(m_dir_ptr->begin(), m_cursor);
+		if (dist < -d)
+			d = -dist;
+	}
+
+	std::advance(m_cursor, d);
+	update_cursor_cache();
+}
+
+void List_dir::rewind_cursor(List_dir::Cursor_position pos)
+{
+	if (!m_dir_ptr || m_dir_ptr->empty()) return;
+
+	if (pos == Cursor_position::beg)
+		m_cursor = m_dir_ptr->begin();
+	else
+		m_cursor = --m_dir_ptr->end();
+
+	update_cursor_cache();
 }
 
 bool List_dir::try_get_cursor(const Path& filename, Dir_cursor& cur,

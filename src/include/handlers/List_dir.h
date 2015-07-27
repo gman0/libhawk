@@ -42,6 +42,8 @@ namespace hawk {
 					// to be sorted otherwise it will give wrong results.
 		};
 
+		enum class Cursor_position { beg, end };
+
 	private:
 		Cursor_cache& m_cursor_cache;
 
@@ -74,9 +76,13 @@ namespace hawk {
 		void set_cursor(Dir_cursor cursor);
 		void set_cursor(const Path& filename, Cursor_search_direction dir);
 
+		void advance_cursor(Dir_vector::difference_type d);
+		void rewind_cursor(Cursor_position pos);
+
 		virtual void set_path(const Path& path);
 
 	private:
+		void update_cursor_cache();
 		void acquire_cursor();
 	};
 }
