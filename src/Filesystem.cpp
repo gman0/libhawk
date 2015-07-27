@@ -358,32 +358,21 @@ time_t last_write_time(const Path& p, int& err) noexcept
 
 Path canonical(const Path& p, const Path& base)
 {
-	thread_local static struct Buffer
-	{
-		char* ptr;
-		Buffer() : ptr{new char[PATH_MAX]} {}
-		~Buffer() { delete [] ptr; }
-	} buf;
-
-	char* res = (p.is_absolute()) ? realpath(p.c_str(), buf.ptr)
-								  : realpath((base / p).c_str(), buf.ptr);
+	char buf[PATH_MAX];
+	char* res = (p.is_absolute()) ? realpath(p.c_str(), buf)
+								  : realpath((base / p).c_str(), buf);
 
 	if (res == nullptr)
 		throw Filesystem_error {{base / p}, errno};
 
-	return Path {buf.ptr};
+	return Path {buf};
 }
 
 Path canonical(const Path& p, const Path& base, int& err) noexcept
 {
-	thread_local static struct Buffer
-	{
-		char* ptr;
-		Buffer() : ptr{new char[PATH_MAX]} {}
-		~Buffer() { delete [] ptr; }
-	} buf;
+	char buf[PATH_MAX];
 
-	if (realpath((base / p).c_str(), buf.ptr) == nullptr)
+	if (realpath((base / p).c_str(), buf) == nullptr)
 	{
 		err = errno;
 		return Path {};
@@ -391,7 +380,7 @@ Path canonical(const Path& p, const Path& base, int& err) noexcept
 
 	err = 0;
 
-	return Path {buf.ptr};
+	return Path {buf};
 }
 
 Path read_symlink(const Path& p)
@@ -607,7 +596,7 @@ void remove_recursively(const Path& dir)
 		if (!is_directory(st))
 			remove_file(p);
 		else
-			prev_path = p;
+			prev_path = std::move(p);
 	}
 
 	remove_ndirectories(prev_level, std::move(prev_path));
