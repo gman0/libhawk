@@ -23,17 +23,13 @@
 #include <vector>
 #include <memory>
 #include <utility>
-#include <condition_variable>
 #include <exception>
-#include <functional>
-#include <mutex>
 #include <shared_mutex>
-#include <atomic>
 #include <chrono>
 #include "Path.h"
 #include "View_types.h"
 #include "Dir_cache.h"
-#include "Interruptible_thread.h"
+#include "Tasking.h"
 #include "handlers/List_dir.h"
 
 namespace hawk {
@@ -77,6 +73,9 @@ namespace hawk {
 		mutable std::shared_timed_mutex m_path_sm;
 		Path m_path;
 
+		mutable std::shared_timed_mutex m_preview_path_sm;
+		Path m_preview_path;
+
 		List_dir_vector m_views;
 		View_ptr m_preview;
 		std::chrono::milliseconds m_preview_delay;
@@ -86,28 +85,8 @@ namespace hawk {
 		const View_types& m_view_types;
 		Cursor_cache& m_cursor_cache;
 
-		Interruptible_thread m_tasking_thread;
-		struct Tasking
-		{
-			std::condition_variable cv;
-			std::mutex m;
-			bool ready_for_tasking;
-			std::atomic<bool> global;
-			std::function<void()> task;
-
-			Exception_handler exception_handler;
-
-			Tasking(const Exception_handler& eh)
-				:
-				  ready_for_tasking{true},
-				  global{false},
-				  exception_handler{eh}
-			{}
-
-			void run_task(std::unique_lock<std::mutex>& lk,
-						  std::function<void()>&& f);
-			void operator()();
-		} m_tasking;
+		Tasking m_tasking;
+		Tasking::Exception_handler m_exception_handler;
 
 	public:
 
@@ -115,25 +94,13 @@ namespace hawk {
 		// primary_list_dir is used for the last (nviews+1)-th view.
 		// Note that both primary_list_dir and secondary_list_dir
 		// may be null - in that case the List_dir handler registered
-		// in Type_factory will be used.
+		// in View_types will be used.
 		View_group(
 				const Path& p, int nviews, const View_types& vt,
 				Cursor_cache& cc, const Exception_handler& eh,
 				const View_types::Handler& primary_list_dir,
 				const View_types::Handler& secondary_list_dir,
-				std::chrono::milliseconds preview_delay)
-			:
-			  m_path{p},
-			  m_preview_delay{preview_delay},
-			  m_view_types{vt},
-			  m_cursor_cache{cc},
-			  m_tasking{eh}
-		{
-			build_views(--nviews, primary_list_dir, secondary_list_dir);
-			m_tasking_thread = Interruptible_thread {std::ref(m_tasking)};
-		}
-
-		~View_group();
+				std::chrono::milliseconds preview_delay);
 
 		View_group(const View_group&) = delete;
 		View_group& operator=(const View_group&) = delete;
@@ -146,16 +113,19 @@ namespace hawk {
 
 		const List_dir_vector& get_views() const;
 
-		// Warning: the View pointed to by the returned pointer
-		//          gets deleted every time set_path/reload_path
-		//          or set_cursor is called!
+		// Warning: the View pointed to by the returned pointer gets
+		//          deleted every time the cursor gets changed
+		//          (set_path/reload_path changes the cursor as well).
 		const View* get_preview() const;
 
-		void set_cursor(Dir_cursor cursor);
+		Path get_cursor_path() const;
 		// See handlers/List_dir.h for Cursor_search_direction
 		void set_cursor(const Path& filename,
 				List_dir::Cursor_search_direction dir =
 					List_dir::Cursor_search_direction::begin);
+
+		void advance_cursor(Dir_vector::difference_type d);
+		void rewind_cursor(List_dir::Cursor_position p);
 
 	private:
 		void build_views(int nviews, const View_types::Handler& primary_ld,
@@ -166,12 +136,11 @@ namespace hawk {
 		void initialize_views(int nviews);
 
 		void update_cursors(Path path);
+		void set_cursor_path(const Path& p);
 
 		void update_paths(Path path);
 		void update_active_cursor();
-		// Used when calling set_cursor(). Returns true if
-		// the cursor can be safely set.
-		bool can_set_cursor(bool override);
+		bool can_set_cursor();
 
 		void add_view(const View_types::Handler& closure);
 		// Sets view's path and calls its ready().
@@ -179,9 +148,11 @@ namespace hawk {
 
 		void create_preview(const Path& path);
 		void destroy_preview();
-
-		void task_load_path(const Path& path);
-		void task_create_preview(const Path& path);
+		// If the user is scrolling the cursor too fast, don't
+		// create the preview immediately. Instead, wait for
+		// m_preview_delay milliseconds whilst checking for
+		// interrupts.
+		void delay_preview();
 	};
 }
 

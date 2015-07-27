@@ -36,15 +36,6 @@ namespace hawk {
 
 namespace {
 
-struct Global_guard
-{
-	std::atomic<bool>& global;
-	Global_guard(std::atomic<bool>& glob) : global{glob}
-	{ global.store(true, std::memory_order_release); }
-	~Global_guard()
-	{ global.store(false, std::memory_order_release); }
-};
-
 std::vector<Path> dissect_path(Path& p, int nviews)
 {
 	std::vector<Path> paths(nviews + 1);
@@ -83,65 +74,49 @@ void check_and_rollback_path(Path& p, const Path& old_p)
 
 } // unnamed-namespace
 
-View_group::~View_group()
+View_group::View_group(
+		const Path& p, int nviews, const View_types& vt,
+		Cursor_cache& cc, const Exception_handler& eh,
+		const View_types::Handler& primary_list_dir,
+		const View_types::Handler& secondary_list_dir,
+		std::chrono::milliseconds preview_delay)
+	:
+	  m_path{p},
+	  m_preview_delay{preview_delay},
+	  m_view_types{vt},
+	  m_cursor_cache{cc},
+	  m_tasking{eh},
+	  m_exception_handler{eh}
 {
-	if (!m_tasking_thread.joinable())
-		return;
-
-	m_tasking_thread.soft_interrupt();
-
-	std::unique_lock<std::mutex> lk {m_tasking.m};
-	m_tasking_thread.hard_interrupt();
-	m_tasking.run_task(lk, []{
-		for (;;)
-			hard_interruption_point();
-	});
-
-	m_tasking_thread.join();
+	build_views(nviews - 1, primary_list_dir, secondary_list_dir);
 }
 
 Path View_group::get_path() const
 {
-	Path p;
-
-	{
-		std::shared_lock<std::shared_timed_mutex> lk {m_path_sm};
-		p = m_path;
-	}
-
-	return p;
-}
-
-void View_group::task_load_path(const Path& p)
-{
-	Global_guard gg {m_tasking.global};
-
-	update_paths(p);
-	soft_interruption_point();
-
-	update_active_cursor();
-	destroy_free_dir_ptrs(count_empty_views(m_views) + 1);
+	std::shared_lock<std::shared_timed_mutex> lk {m_path_sm};
+	return m_path;
 }
 
 void View_group::set_path(Path p)
 {
 	try { p = canonical(p, m_path); }
-	catch (...) { m_tasking.exception_handler(std::current_exception()); }
+	catch (...) { m_exception_handler(std::current_exception()); }
 
 	if (p.empty())
 		p = "/";
 	else
-		check_and_rollback_path(p, m_path);
+		check_and_rollback_path(p, get_path());
 
-	m_tasking_thread.soft_interrupt();
-
-	std::unique_lock<std::mutex> lk {m_tasking.m};
-	m_tasking.run_task(lk, [&, p]{
+	m_tasking.run_task(Tasking::Priority::high, [&, p]{
 		update_cursors(p);
-		task_load_path(p);
+		update_paths(p);
 
 		std::lock_guard<std::shared_timed_mutex> lk {m_path_sm};
 		m_path = p;
+	});
+
+	m_tasking.run_task(Tasking::Priority::low, [this]{
+		update_active_cursor();
 	});
 }
 
@@ -150,11 +125,13 @@ void View_group::reload_path()
 	std::unique_lock<std::shared_timed_mutex> lk_path {m_path_sm};
 	check_and_rollback_path(m_path, m_path);
 
-	m_tasking_thread.soft_interrupt();
+	m_tasking.run_task(Tasking::Priority::high,
+		[this, l = {std::move(lk_path)}]{
+			update_paths(m_path);
+		});
 
-	std::unique_lock<std::mutex> lk {m_tasking.m};
-	m_tasking.run_task(lk, [this, l {std::move(lk_path)}]{
-		task_load_path(m_path);
+	m_tasking.run_task(Tasking::Priority::low, [this]{
+		update_active_cursor();
 	});
 }
 
@@ -163,30 +140,59 @@ const View_group::List_dir_vector& View_group::get_views() const
 	return m_views;
 }
 
-const View*View_group::get_preview() const
+const View* View_group::get_preview() const
 {
 	return m_preview.get();
 }
 
-void View_group::set_cursor(Dir_cursor cursor)
+Path View_group::get_cursor_path() const
 {
-	if (can_set_cursor(m_tasking.global.load(std::memory_order_acquire)))
-	{
-		List_dir_ptr& ld = m_views.back();
-		ld->set_cursor(cursor);
-		create_preview({ld->get_path() / cursor->path});
-	}
+	std::shared_lock<std::shared_timed_mutex> lk {m_preview_path_sm};
+	return m_preview_path;
 }
 
 void View_group::set_cursor(const Path& filename,
 							List_dir::Cursor_search_direction dir)
 {
-	if (can_set_cursor(m_tasking.global.load(std::memory_order_acquire)))
-	{
+	m_tasking.run_task(Tasking::Priority::low,
+		[this, filename, dir]{
+			if (!can_set_cursor())
+				return;
+
+			List_dir_ptr& ld = m_views.back();
+			ld->set_cursor(filename, dir);
+
+			delay_preview();
+			create_preview(ld->get_path() / ld->get_cursor()->path);
+		});
+}
+
+void View_group::advance_cursor(Dir_vector::difference_type d)
+{
+	m_tasking.run_task(Tasking::Priority::low, [this, d]{
+		if (!can_set_cursor())
+			return;
+
 		List_dir_ptr& ld = m_views.back();
-		ld->set_cursor(filename, dir);
-		create_preview({ld->get_path() / ld->get_cursor()->path});
-	}
+		ld->advance_cursor(d);
+
+		delay_preview();
+		create_preview(ld->get_cursor()->path);
+	});
+}
+
+void View_group::rewind_cursor(List_dir::Cursor_position p)
+{
+	m_tasking.run_task(Tasking::Priority::low, [this, p]{
+		if (!can_set_cursor())
+			return;
+
+		List_dir_ptr& ld = m_views.back();
+		ld->rewind_cursor(p);
+
+		delay_preview();
+		create_preview(ld->get_cursor()->path);
+	});
 }
 
 void View_group::build_views(
@@ -242,6 +248,12 @@ void View_group::update_cursors(Path path)
 	}
 }
 
+void View_group::set_cursor_path(const Path& p)
+{
+	std::lock_guard<std::shared_timed_mutex> lk {m_preview_path_sm};
+	m_preview_path = p;
+}
+
 void View_group::update_paths(Path p)
 {
 	int nviews = m_views.size() - 1;
@@ -252,6 +264,8 @@ void View_group::update_paths(Path p)
 		p.set_parent_path();
 		ready_view(*m_views[i], p);
 	}
+
+	destroy_free_dir_ptrs(count_empty_views(m_views) + 1);
 }
 
 void View_group::add_view(const View_types::Handler& closure)
@@ -267,63 +281,38 @@ void View_group::ready_view(View& v, const Path& p)
 
 void View_group::update_active_cursor()
 {
-	if (can_set_cursor(false))
+	set_cursor_path("");
+
+	if (can_set_cursor())
 	{
 		List_dir_ptr& ld = m_views.back();
-		task_create_preview({ld->get_path() / ld->get_cursor()->path});
+		create_preview({ld->get_path() / ld->get_cursor()->path});
 	}
 }
 
-bool View_group::can_set_cursor(bool override)
+bool View_group::can_set_cursor()
 {
 	destroy_preview();
+	const Dir_vector* dir = m_views.back()->get_contents();
 
-	if (override)
-		return false;
-
-	return !m_views.back()->get_contents().empty();
+	return dir && !dir->empty();
 }
 
 void View_group::create_preview(const Path& p)
 {
-	m_tasking_thread.soft_interrupt();
+	set_cursor_path(p);
 
-	std::unique_lock<std::mutex> lk {m_tasking.m};
-	m_tasking.run_task(lk, [&, p]{
-		// If the user is scrolling the cursor too fast, don't
-		// create the preview immediately. Instead, wait for
-		// m_preview_delay milliseconds whilst checking for
-		// interrupts.
-		auto now = std::chrono::steady_clock::now();
-		if (m_preview_delay + m_preview_timestamp > now)
-		{
-			for (int i = m_preview_delay.count(); i != 0; i--)
-			{
-				std::this_thread::sleep_for(
-							std::chrono::milliseconds{1});
-				soft_interruption_point();
-			}
-		}
-
-		m_preview_timestamp = now;
-		task_create_preview(p);
-	});
-}
-
-void View_group::task_create_preview(const Path& p)
-{
 	auto handler = m_view_types.get_handler(p);
 	if (!handler) return;
 
 	m_preview.reset(handler());
 	soft_interruption_point();
 
-	try { ready_view(*m_preview, p); }
-	catch (...)
-	{
-		destroy_preview();
-		throw;
-	}
+	// ready_view() can throw, we need to separate the assignment to m_preview
+	View_ptr preview {handler()};
+	ready_view(*preview, p);
+
+	m_preview = std::move(preview);
 }
 
 void View_group::destroy_preview()
@@ -331,50 +320,20 @@ void View_group::destroy_preview()
 	m_preview.reset();
 }
 
-void View_group::Tasking::run_task(std::unique_lock<std::mutex>& lk,
-								   std::function<void()>&& f)
+void View_group::delay_preview()
 {
-	cv.wait(lk, [this]{ return ready_for_tasking; });
-
-	ready_for_tasking = false;
-	task = std::move(f);
-
-	lk.unlock();
-	cv.notify_one();
-}
-
-void View_group::Tasking::operator()()
-{
-	std::unique_lock<std::mutex> lk {m, std::defer_lock};
-
-	auto start_task = [&]{
-		lk.lock();
-		cv.wait(lk, [this]{ return !ready_for_tasking; });
-		_soft_iflag.clear();
-		lk.unlock();
-		cv.notify_one();
-	};
-
-	auto end_task = [&]{
-		lk.lock();
-		ready_for_tasking = true;
-		lk.unlock();
-		cv.notify_one();
-	};
-
-	for (;;)
+	auto now = std::chrono::steady_clock::now();
+	if (m_preview_delay + m_preview_timestamp > now)
 	{
-		start_task();
-
-		try { task(); }
-		catch (const Soft_thread_interrupt&) {}
-		catch (const Hard_thread_interrupt&) { throw; }
-		catch (...) {
-			exception_handler(std::current_exception());
+		for (int i = m_preview_delay.count(); i != 0; i--)
+		{
+			std::this_thread::sleep_for(
+						std::chrono::milliseconds{1});
+			soft_interruption_point();
 		}
-
-		end_task();
 	}
+
+	m_preview_timestamp = now;
 }
 
 } // namespace hawk
