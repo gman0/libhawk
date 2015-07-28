@@ -96,6 +96,7 @@ void update_progress(
 					std::chrono::seconds>(now - start);
 
 		File_progress progress;
+		progress.total = total_size;
 		progress.offset = offset;
 		progress.rate = bytes_read / time_elapsed.count();
 		progress.eta_end =

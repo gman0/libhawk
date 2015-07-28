@@ -37,6 +37,7 @@ namespace hawk {
 
 	struct File_progress
 	{
+		uintmax_t total;
 		uintmax_t offset;
 		uintmax_t rate;
 		std::chrono::seconds eta_end;
