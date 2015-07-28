@@ -23,6 +23,7 @@
 #include <memory>
 #include <functional>
 #include <vector>
+#include <chrono>
 #include "Path.h"
 #include "User_data.h"
 
@@ -52,16 +53,18 @@ namespace hawk
 
 	// Starts a thread that checks filesystem every second and
 	// updates cache entries if needed.
-	void start_filesystem_watchdog(On_fs_change&& on_fs_change,
-								   On_sort_change&& on_sort_change,
-								   Populate_user_data&& populate);
+	void start_filesystem_watchdog(std::chrono::milliseconds update_interval,
+								   On_fs_change&& on_fs_change);
 
 	// More or less for internal purposes...
 	// ent has to already contain filename of file/directory
 	// Populate_user_data functor is then supplied with {base/ent.path}
 	void populate_user_data(const Path& base, Dir_entry& ent);
 
+	void set_on_sort_change(On_sort_change&& on_sort_change);
+	void set_populate_user_data(Populate_user_data&& populate_ud);
 	void set_sort_predicate(Dir_sort_predicate&& pred);
+
 	Dir_sort_predicate get_sort_predicate();
 
 	// Returns a shared pointer with sorted directory entries.

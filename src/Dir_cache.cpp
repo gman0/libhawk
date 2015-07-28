@@ -300,6 +300,9 @@ struct
 {
 	Cache_list entries;
 	Filesystem_watchdog fs_watchdog;
+	std::chrono::milliseconds update_interval;
+
+	std::mutex sort_pred_mtx;
 
 	On_sort_change on_sort_change;
 	Dir_sort_predicate sort_pred;
@@ -345,6 +348,7 @@ void sort_dir(Dir_vector& v)
 {
 	if (s_state.sort_pred)
 	{
+		std::lock_guard<std::mutex> lk {s_state.sort_pred_mtx};
 		parallel_sort(0, v.size(), v);
 	}
 }
@@ -410,7 +414,7 @@ void fs_watchdog()
 		}
 
 		if (!s_state.fs_watchdog.done)
-			std::this_thread::sleep_for(std::chrono::seconds {1});
+			std::this_thread::sleep_for(s_state.update_interval);
 		else
 			break;
 	}
@@ -445,23 +449,36 @@ void populate_user_data(const Path& base, Dir_entry& ent)
 		s_state.populate_user_data({base / ent.path}, ent.user_data);
 }
 
-void start_filesystem_watchdog(On_fs_change&& on_fs_change,
-							   On_sort_change&& on_sort_change,
-							   Populate_user_data&& populate)
+void start_filesystem_watchdog(std::chrono::milliseconds update_interval,
+							   On_fs_change&& on_fs_change)
 {
 	static bool call_once = false;
 	if (!call_once) call_once = true;
-	else assert(0 && "_start_filesystem_watchdog can be called only once!");
+	else assert(0 && "start_filesystem_watchdog can be called only once!");
 
-
+	s_state.update_interval = update_interval;
 	s_state.fs_watchdog.on_change = std::move(on_fs_change);
-	s_state.on_sort_change = std::move(on_sort_change);
-	s_state.populate_user_data = std::move(populate);
 	s_state.fs_watchdog.thread = std::thread {&fs_watchdog};
+}
+
+void set_on_sort_change(On_sort_change&& on_sort_change)
+{
+	assert(!s_state.fs_watchdog.thread.joinable()
+		   && "Setting On_sort_change is not allowed while filesystem-wachdog is running");
+	s_state.on_sort_change = std::move(on_sort_change);
+}
+
+void set_populate_user_data(Populate_user_data&& populate_ud)
+{
+	assert(!s_state.fs_watchdog.thread.joinable()
+		   && "Setting Populate_user_data is not allowed while filesystem-wachdog is running");
+	s_state.populate_user_data = std::move(populate_ud);
 }
 
 void set_sort_predicate(Dir_sort_predicate&& pred)
 {
+	std::lock_guard<std::mutex> lk {s_state.sort_pred_mtx};
+
 	s_state.sort_pred = std::move(pred);
 
 	s_state.entries.for_each([](Cache_entry& ent) {
