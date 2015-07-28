@@ -126,10 +126,21 @@ void copy_file(IO_task* parent, IO_task::Context& ctx,
 
 	if (ctx.offset == 0)
 	{
+		/*
+		 * Calling posix_fallocate on filesystems that don't support
+		 * preallocation is bullshit:
+		 * https://sourceware.org/bugzilla/show_bug.cgi?id=18515
+		 * even though there's already a fix for the POSIX spec.:
+		 * http://pubs.opengroup.org/onlinepubs/9699919799//functions/posix_fallocate.html#tag_16_366_05
+		 * using EINVAL as a preallocation-not-supported error.
+		 *
+		 * TODO: uncomment this code somewhere in the future
+		 *
 		int err = 0;
-		err = posix_fallocate64(dst_file.get_fd(), 0, sz); // fatal
+		err = posix_fallocate64(dst_file.get_fd(), 0, sz);
 
-		if (err) throw IO_task_fatal {dst, err};
+		if (err && err != EINVAL) throw IO_task_fatal {dst, err};
+		*/
 	}
 	else
 	{
