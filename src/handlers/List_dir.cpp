@@ -197,4 +197,9 @@ void List_dir::set_path(const Path& dir)
 	acquire_cursor();
 }
 
+const Dir_vector* List_dir::get_contents() const
+{
+	return m_dir_ptr.get();
+}
+
 } // namespace hawk

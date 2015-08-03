@@ -58,7 +58,7 @@ namespace hawk {
 
 		List_dir(const List_dir&) = delete;
 
-		const Dir_vector& get_contents() const { return *m_dir_ptr; }
+		const Dir_vector* get_contents() const;
 
 		Dir_cursor get_cursor() const { return m_cursor; }
 		Dir_const_cursor get_const_cursor() const { return m_cursor; }
