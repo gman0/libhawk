@@ -37,20 +37,22 @@ namespace {
 
 struct Cache_entry
 {
+	Dir_ptr ptr;
+	Path path;
+	bool about_to_be_freed;
 	std::atomic<bool> dirty;
 	time_t timestamp;
-	Path path;
-	Dir_ptr ptr;
 
 	Cache_entry() {}
 	Cache_entry(const Cache_entry& e)
-		: dirty{e.dirty.load()}, timestamp{e.timestamp},
-		  path{e.path}, ptr{e.ptr}
+		: ptr{e.ptr}, path{e.path}, about_to_be_freed{e.about_to_be_freed},
+		  dirty{e.dirty.load()}, timestamp{e.timestamp}
 	{}
 
 	Cache_entry(Cache_entry&& e)
-		: dirty{e.dirty.load()}, timestamp{e.timestamp},
-		  path{std::move(e.path)}, ptr{std::move(e.ptr)}
+		: ptr{std::move(e.ptr)}, path{std::move(e.path)},
+		  about_to_be_freed{e.about_to_be_freed},
+		  dirty{e.dirty.load()}, timestamp{e.timestamp}
 	{}
 };
 
@@ -73,6 +75,15 @@ void free_ptr(Cache_entry& ent)
 	ent.path.clear();
 	shrink(ent.ptr);
 	ent.ptr->clear();
+}
+
+void check_and_free(Cache_entry& ent)
+{
+	if (ent.ptr.unique())
+	{
+		if (ent.about_to_be_freed) free_ptr(ent);
+		else ent.about_to_be_freed = true;
+	}
 }
 
 class Cache_list
@@ -228,9 +239,7 @@ public:
 			Node_state st = Node_state::not_in_use;
 			if (n->state.compare_exchange_strong(st, Node_state::in_use_skip))
 			{
-				if (n->ent.ptr.unique())
-					free_ptr(n->ent);
-
+				check_and_free(n->ent);
 				n->state.store(Node_state::not_in_use);
 			}
 		}
@@ -379,9 +388,7 @@ void mark_outdated_ptr_dirty(
 {
 	if (!exists(ent.path))
 	{
-		if (ent.ptr.unique())
-			free_ptr(ent);
-
+		check_and_free(ent);
 		return;
 	}
 
@@ -423,6 +430,7 @@ void fs_watchdog()
 void build_cache_entry(Cache_entry& ent, const Path& p,
 					   std::shared_ptr<Dir_vector>&& ptr)
 {
+	ent.about_to_be_freed = false;
 	ent.dirty = false;
 	ent.timestamp = last_write_time(p);
 	ent.path = p;
@@ -433,6 +441,7 @@ void build_cache_entry(Cache_entry& ent, const Path& p,
 
 void rebuild_cache_entry(Cache_entry& ent)
 {
+	ent.about_to_be_freed = false;
 	ent.dirty = false;
 	ent.timestamp = last_write_time(ent.path);
 	ent.ptr->clear();
