@@ -27,44 +27,44 @@
 #include "Interruptible_thread.h"
 
 namespace hawk {
+	class Tasking
+	{
+	public:
+		using Task = std::function<void()>;
+		enum class Priority { low, high };
 
-class Tasking
-{
-public:
-	using Task = std::function<void()>;
-	enum class Priority { low, high };
+		using Exception_handler = std::function<
+			void(std::exception_ptr) noexcept>;
 
-	using Exception_handler = std::function<
-		void(std::exception_ptr) noexcept>;
+	private:
+		bool m_ready;
+		Priority m_task_pr;
+		Exception_handler m_eh;
+		Task m_task;
 
-private:
-	bool m_ready;
-	Priority m_task_pr;
-	Exception_handler m_eh;
-	Task m_task;
+		std::mutex m_mtx;
+		std::condition_variable m_cv;
+		Interruptible_thread m_thread;
 
-	std::mutex m_mtx;
-	std::condition_variable m_cv;
-	Interruptible_thread m_thread;
+	public:
+		Tasking(const Exception_handler& eh)
+			:
+			  m_ready{true},
+			  m_task_pr{Priority::low},
+			  m_eh{eh},
+			  m_thread{[this]{ run(); }}
+		{}
 
-public:
-	Tasking(const Exception_handler& eh)
-		:
-		  m_ready{true},
-		  m_task_pr{Priority::low},
-		  m_eh{eh},
-		  m_thread{[this]{ run(); }}
-	{}
+		~Tasking();
 
-	~Tasking();
+		// A task will interrupt and run only if its priority is
+		// is equal or higher than the priority of task currently being run.
+		void run_task(Priority p, Task&& f);
+		void run_blocking_task(Priority p, Task&& f);
 
-	void run_task(Priority p, Task&& f);
-	void run_blocking_task(Priority p, Task&& f);
-
-private:
-	void run();
-};
-
+	private:
+		void run();
+	};
 }
 
 #endif // HAWK_TASKING_H
