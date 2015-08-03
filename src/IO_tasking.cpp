@@ -184,6 +184,8 @@ void copy_file(IO_task* parent, IO_task::Context& ctx,
 		update_progress(parent, bytes_read, ctx.offset, sz,
 						ctx.start, last_update);
 	}
+
+	parent->_increment_offset(sz);
 }
 
 bool same_dev(const Stat& src, const Stat& dst)
@@ -285,6 +287,16 @@ std::chrono::steady_clock::time_point IO_task::time_started() const
 uintmax_t IO_task::total_size() const
 {
 	return m_total;
+}
+
+void IO_task::_increment_offset(uintmax_t file_size)
+{
+	m_offset += file_size;
+}
+
+uintmax_t IO_task::get_offset() const
+{
+	return m_offset;
 }
 
 void IO_task::start_tasking()

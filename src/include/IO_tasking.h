@@ -107,6 +107,7 @@ namespace hawk {
 
 	private:
 		uintmax_t m_total;
+		uintmax_t m_offset;
 		std::chrono::steady_clock::time_point m_start;
 
 		Interruptible_thread m_tasking_thread;
@@ -132,6 +133,13 @@ namespace hawk {
 
 		std::chrono::steady_clock::time_point time_started() const;
 		uintmax_t total_size() const;
+
+		// Called internally after a successful copy_file()
+		void _increment_offset(uintmax_t file_size);
+		// It is advised to call this method only from the callbacks
+		// called by the IO task itself (e.g. Task_progress_monitor,
+		// File_progress_monitor etc.), otherwise it may result in a race.
+		uintmax_t get_offset() const;
 
 	protected:
 		void start_tasking();
