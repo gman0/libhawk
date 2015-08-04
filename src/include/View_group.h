@@ -153,6 +153,7 @@ namespace hawk {
 		// m_preview_delay milliseconds whilst checking for
 		// interrupts.
 		void delay_preview();
+		void delay_create_preview();
 	};
 }
 

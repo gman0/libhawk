@@ -154,45 +154,32 @@ Path View_group::get_cursor_path() const
 void View_group::set_cursor(const Path& filename,
 							List_dir::Cursor_search_direction dir)
 {
-	m_tasking.run_task(Tasking::Priority::low,
-		[this, filename, dir]{
-			if (!can_set_cursor())
-				return;
+	m_tasking.run_blocking_task(Tasking::Priority::low, [&]{
+		if (can_set_cursor())
+			m_views.back()->set_cursor(filename, dir);
+	});
 
-			List_dir_ptr& ld = m_views.back();
-			ld->set_cursor(filename, dir);
-
-			delay_preview();
-			create_preview(ld->get_path() / ld->get_cursor()->path);
-		});
+	delay_create_preview();
 }
 
 void View_group::advance_cursor(Dir_vector::difference_type d)
 {
-	m_tasking.run_task(Tasking::Priority::low, [this, d]{
-		if (!can_set_cursor())
-			return;
-
-		List_dir_ptr& ld = m_views.back();
-		ld->advance_cursor(d);
-
-		delay_preview();
-		create_preview(ld->get_cursor()->path);
+	m_tasking.run_blocking_task(Tasking::Priority::low, [&]{
+		if (can_set_cursor())
+			m_views.back()->advance_cursor(d);
 	});
+
+	delay_create_preview();
 }
 
 void View_group::rewind_cursor(List_dir::Cursor_position p)
 {
-	m_tasking.run_task(Tasking::Priority::low, [this, p]{
-		if (!can_set_cursor())
-			return;
-
-		List_dir_ptr& ld = m_views.back();
-		ld->rewind_cursor(p);
-
-		delay_preview();
-		create_preview(ld->get_cursor()->path);
+	m_tasking.run_blocking_task(Tasking::Priority::low, [&]{
+		if (can_set_cursor())
+			m_views.back()->rewind_cursor(p);
 	});
+
+	delay_create_preview();
 }
 
 void View_group::build_views(
@@ -334,6 +321,16 @@ void View_group::delay_preview()
 	}
 
 	m_preview_timestamp = now;
+}
+
+void View_group::delay_create_preview()
+{
+	m_tasking.run_task(Tasking::Priority::low, [this]{
+		delay_preview();
+
+		List_dir_ptr& ld = m_views.back();
+		create_preview(ld->get_path() / ld->get_cursor()->path);
+	});
 }
 
 } // namespace hawk
