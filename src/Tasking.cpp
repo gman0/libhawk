@@ -29,6 +29,17 @@ bool operator<(Tasking::Priority lhs, Tasking::Priority rhs)
 	return static_cast<int>(lhs) < static_cast<int>(rhs);
 }
 
+using Barriere = std::promise<void>;
+class Barriere_guard
+{
+private:
+	Barriere& m_barr;
+
+public:
+	Barriere_guard(Barriere& b) : m_barr{b} {}
+	~Barriere_guard() { m_barr.set_value(); }
+};
+
 } // unnamed-namespace
 
 Tasking::~Tasking()
@@ -42,14 +53,14 @@ Tasking::~Tasking()
 	});
 }
 
-void Tasking::run_task(Tasking::Priority p, Tasking::Task&& f)
+bool Tasking::run_task(Tasking::Priority p, Tasking::Task&& f)
 {
 	std::unique_lock<std::mutex> lk {m_mtx};
 
 	if (p < m_task_pr)
 	{
 		// Don't interrupt tasks with higher priority!
-		return;
+		return false;
 	}
 
 	m_thread.soft_interrupt();
@@ -61,18 +72,23 @@ void Tasking::run_task(Tasking::Priority p, Tasking::Task&& f)
 
 	lk.unlock();
 	m_cv.notify_one();
+
+	return true;
 }
 
-void Tasking::run_blocking_task(Tasking::Priority p, Tasking::Task&& f)
+bool Tasking::run_blocking_task(Tasking::Priority p, Tasking::Task&& f)
 {
-	std::promise<void> pr;
+	Barriere b;
 
-	run_task(p, [&]{
+	bool r = run_task(p, [&]{
+		Barriere_guard bg {b};
 		f();
-		pr.set_value();
 	});
 
-	pr.get_future().wait();
+	if (r)
+		b.get_future().wait();
+
+	return r;
 }
 
 void Tasking::run()

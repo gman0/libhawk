@@ -59,8 +59,9 @@ namespace hawk {
 
 		// A task will interrupt and run only if its priority is
 		// is equal or higher than the priority of task currently being run.
-		void run_task(Priority p, Task&& f);
-		void run_blocking_task(Priority p, Task&& f);
+		// In that case it returns true.
+		bool run_task(Priority p, Task&& f);
+		bool run_blocking_task(Priority p, Task&& f);
 
 	private:
 		void run();
