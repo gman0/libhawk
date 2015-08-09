@@ -20,18 +20,24 @@
 #ifndef HAWK_INTERRUPT_H
 #define HAWK_INTERRUPT_H
 
-#include <atomic>
+#include <mutex>
 
 namespace hawk {
+	void soft_interruption_point();
+	void hard_interruption_point();
+
 	class Interrupt_flag
 	{
 	private:
-		std::atomic<bool> m_flag;
+		std::mutex m;
+		bool flag;
 
 	public:
 		void set();
 		void clear();
-		bool is_set() const;
+
+		friend void soft_interruption_point();
+		friend void hard_interruption_point();
 	};
 
 	extern thread_local Interrupt_flag _soft_iflag;
@@ -40,9 +46,6 @@ namespace hawk {
 	// These two classes are used as exception types.
 	class Soft_thread_interrupt {};
 	class Hard_thread_interrupt {};
-
-	void soft_interruption_point();
-	void hard_interruption_point();
 }
 
 #endif // HAWK_INTERRUPT_H

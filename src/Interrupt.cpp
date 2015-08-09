@@ -26,33 +26,32 @@ thread_local Interrupt_flag _hard_iflag;
 
 void Interrupt_flag::set()
 {
-	m_flag.store(true, std::memory_order_relaxed);
+	std::lock_guard<std::mutex> lk {m};
+	flag = true;
 }
 
 void Interrupt_flag::clear()
 {
-	m_flag.store(false, std::memory_order_relaxed);
-}
-
-bool Interrupt_flag::is_set() const
-{
-	return m_flag.load(std::memory_order_relaxed);
+	std::lock_guard<std::mutex> lk {m};
+	flag = false;
 }
 
 void soft_interruption_point()
 {
-	if (_soft_iflag.is_set())
+	std::lock_guard<std::mutex> lk {_soft_iflag.m};
+	if (_soft_iflag.flag)
 	{
-		_soft_iflag.clear();
+		_soft_iflag.flag = false;
 		throw Soft_thread_interrupt();
 	}
 }
 
 void hard_interruption_point()
 {
-	if (_hard_iflag.is_set())
+	std::lock_guard<std::mutex> lk {_hard_iflag.m};
+	if (_hard_iflag.flag)
 	{
-		_hard_iflag.clear();
+		_hard_iflag.flag = false;
 		throw Hard_thread_interrupt();
 	}
 }
