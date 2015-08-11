@@ -156,7 +156,11 @@ void View_group::set_cursor(const Path& filename,
 {
 	m_tasking.run_blocking_task(Tasking::Priority::low, [&]{
 		if (can_set_cursor())
-			m_views.back()->set_cursor(filename, dir);
+		{
+			List_dir_ptr& ld = m_views.back();
+			ld->set_cursor(filename, dir);
+			set_cursor_path(m_path / ld->get_cursor()->path);
+		}
 	});
 
 	delay_create_preview();
@@ -166,7 +170,11 @@ void View_group::advance_cursor(Dir_vector::difference_type d)
 {
 	m_tasking.run_blocking_task(Tasking::Priority::low, [&]{
 		if (can_set_cursor())
-			m_views.back()->advance_cursor(d);
+		{
+			List_dir_ptr& ld = m_views.back();
+			ld->advance_cursor(d);
+			set_cursor_path(m_path / ld->get_cursor()->path);
+		}
 	});
 
 	delay_create_preview();
@@ -176,7 +184,11 @@ void View_group::rewind_cursor(List_dir::Cursor_position p)
 {
 	m_tasking.run_blocking_task(Tasking::Priority::low, [&]{
 		if (can_set_cursor())
-			m_views.back()->rewind_cursor(p);
+		{
+			List_dir_ptr& ld = m_views.back();
+			ld->rewind_cursor(p);
+			set_cursor_path(m_path / ld->get_cursor()->path);
+		}
 	});
 
 	delay_create_preview();
@@ -223,6 +235,8 @@ void View_group::initialize_views(int nviews)
 
 void View_group::update_cursors(Path path)
 {
+	set_cursor_path("");
+
 	Path filename = path.filename();
 	path.set_parent_path();
 
@@ -273,7 +287,7 @@ void View_group::update_active_cursor()
 	if (can_set_cursor())
 	{
 		List_dir_ptr& ld = m_views.back();
-		create_preview({ld->get_path() / ld->get_cursor()->path});
+		create_preview({ld->get_path() / ld->get_cursor()->path}, true);
 	}
 }
 
@@ -285,9 +299,10 @@ bool View_group::can_set_cursor()
 	return dir && !dir->empty();
 }
 
-void View_group::create_preview(const Path& p)
+void View_group::create_preview(const Path& p, bool set_cpath)
 {
-	set_cursor_path(p);
+	if (set_cpath)
+		set_cursor_path(p);
 
 	auto handler = m_view_types.get_handler(p);
 	if (!handler) return;
@@ -329,7 +344,7 @@ void View_group::delay_create_preview()
 		delay_preview();
 
 		List_dir_ptr& ld = m_views.back();
-		create_preview(ld->get_path() / ld->get_cursor()->path);
+		create_preview(ld->get_path() / ld->get_cursor()->path, false);
 	});
 }
 

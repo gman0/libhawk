@@ -146,7 +146,7 @@ namespace hawk {
 		// Sets view's path and calls its ready().
 		void ready_view(View& v, const Path& path);
 
-		void create_preview(const Path& path);
+		void create_preview(const Path& path, bool set_cpath);
 		void destroy_preview();
 		// If the user is scrolling the cursor too fast, don't
 		// create the preview immediately. Instead, wait for
