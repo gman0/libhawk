@@ -20,6 +20,8 @@
 #ifndef HAWK_TASKING_H
 #define HAWK_TASKING_H
 
+#include <vector>
+#include <initializer_list>
 #include <utility>
 #include <functional>
 #include <mutex>
@@ -30,17 +32,19 @@ namespace hawk {
 	class Tasking
 	{
 	public:
-		using Task = std::function<void()>;
 		enum class Priority { low, high };
+
+		using Task = std::function<void()>;
+		using PTask = std::pair<Priority, Task>;
 
 		using Exception_handler = std::function<
 			void(std::exception_ptr) noexcept>;
 
 	private:
 		bool m_ready;
-		Priority m_task_pr;
 		Exception_handler m_eh;
-		Task m_task;
+		Priority m_current_priority;
+		std::vector<std::pair<Priority, Task>> m_tasks;
 
 		std::mutex m_mtx;
 		std::condition_variable m_cv;
@@ -50,8 +54,8 @@ namespace hawk {
 		Tasking(const Exception_handler& eh)
 			:
 			  m_ready{true},
-			  m_task_pr{Priority::low},
 			  m_eh{eh},
+			  m_current_priority{Priority::low},
 			  m_thread{[this]{ run(); }}
 		{}
 
@@ -63,8 +67,17 @@ namespace hawk {
 		bool run_task(Priority p, Task&& f);
 		bool run_blocking_task(Priority p, Task&& f);
 
+		// Runs tasks in succession (in forward order - from begin() to end()).
+		// Returns false only if the first task could not be run because
+		// of its low priority.
+		bool run_tasks(std::initializer_list<PTask> l);
+
 	private:
 		void run();
+		void dispatch_tasks();
+
+		void start_tasks();
+		void end_tasks();
 	};
 }
 

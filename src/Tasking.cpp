@@ -55,20 +55,23 @@ Tasking::~Tasking()
 
 bool Tasking::run_task(Tasking::Priority p, Tasking::Task&& f)
 {
+	return run_tasks({ {p, std::move(f)} });
+}
+
+bool Tasking::run_tasks(std::initializer_list<PTask> l)
+{
 	std::unique_lock<std::mutex> lk {m_mtx};
 
-	if (p < m_task_pr)
-	{
-		// Don't interrupt tasks with higher priority!
+	Priority first_p = l.begin()->first;
+	if (first_p < m_current_priority)
 		return false;
-	}
 
 	m_thread.soft_interrupt();
 	m_cv.wait(lk, [this]{ return m_ready; });
 
 	m_ready = false;
-	m_task_pr = p;
-	m_task = std::move(f);
+	m_current_priority = first_p;
+	m_tasks = l;
 
 	lk.unlock();
 	m_cv.notify_one();
@@ -85,43 +88,59 @@ bool Tasking::run_blocking_task(Tasking::Priority p, Tasking::Task&& f)
 		f();
 	});
 
-	if (r)
-		b.get_future().wait();
+	if (r) b.get_future().wait();
 
 	return r;
 }
 
 void Tasking::run()
 {
-	std::unique_lock<std::mutex> lk {m_mtx, std::defer_lock};
-
-	auto start_task = [&]{
-		lk.lock();
-		m_cv.wait(lk, [this]{ return !m_ready; });
-		_soft_iflag.clear();
-		lk.unlock();
-		m_cv.notify_one();
-	};
-
-	auto end_task = [&]{
-		lk.lock();
-		m_ready = true;
-		m_task_pr = Priority::low;
-		lk.unlock();
-		m_cv.notify_one();
-	};
-
 	for (;;)
 	{
-		start_task();
+		start_tasks();
 
-		try { m_task(); }
+		try { dispatch_tasks(); }
 		catch (const Soft_thread_interrupt&) {}
 		catch (const Hard_thread_interrupt&) { return; }
 		catch (...) { m_eh(std::current_exception()); }
 
-		end_task();
+		end_tasks();
 	}
+}
+
+void Tasking::dispatch_tasks()
+{
+	for (auto& pt : m_tasks)
+	{
+		{
+			std::lock_guard<std::mutex> lk {m_mtx};
+			m_current_priority = pt.first;
+		}
+
+		// Run the task.
+		pt.second();
+	}
+}
+
+void Tasking::start_tasks()
+{
+	std::unique_lock<std::mutex> lk {m_mtx};
+
+	m_cv.wait(lk, [this]{ return !m_ready; });
+	_soft_iflag.clear();
+
+	m_cv.notify_one();
+}
+
+void Tasking::end_tasks()
+{
+	std::unique_lock<std::mutex> lk {m_mtx};
+
+	m_ready = true;
+	m_current_priority = Priority::low;
+	m_tasks.clear();
+
+	m_cv.notify_one();
 }
 
 } // namespace hawk

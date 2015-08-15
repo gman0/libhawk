@@ -107,16 +107,19 @@ void View_group::set_path(Path p)
 	else
 		check_and_rollback_path(p, get_path());
 
-	m_tasking.run_task(Tasking::Priority::high, [&, p]{
-		update_cursors(p);
-		update_paths(p);
+	m_tasking.run_tasks({
+		{Tasking::Priority::high, [&, p]{
+			update_cursors(p);
+			update_paths(p);
 
-		std::lock_guard<std::shared_timed_mutex> lk {m_path_sm};
-		m_path = p;
-	});
-
-	m_tasking.run_task(Tasking::Priority::low, [this]{
-		update_active_cursor();
+			std::lock_guard<std::shared_timed_mutex> lk {m_path_sm};
+			m_path = p;
+		 }
+		},
+		{Tasking::Priority::low, [this]{
+			update_active_cursor();
+		 }
+		}
 	});
 }
 
@@ -125,13 +128,15 @@ void View_group::reload_path()
 	std::unique_lock<std::shared_timed_mutex> lk_path {m_path_sm};
 	check_and_rollback_path(m_path, m_path);
 
-	m_tasking.run_task(Tasking::Priority::high,
-		[this, l = {std::move(lk_path)}]{
-			update_paths(m_path);
-		});
-
-	m_tasking.run_task(Tasking::Priority::low, [this]{
-		update_active_cursor();
+	m_tasking.run_tasks({
+		{Tasking::Priority::high, [this, l = {std::move(lk_path)}]{
+			 update_paths(m_path);
+		 }
+		},
+		{Tasking::Priority::low, [this]{
+			 update_active_cursor();
+		 }
+		}
 	});
 }
 
