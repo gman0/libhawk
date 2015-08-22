@@ -102,6 +102,8 @@ namespace hawk {
 				const View_types::Handler& secondary_list_dir,
 				std::chrono::milliseconds preview_delay);
 
+		virtual ~View_group() = default;
+
 		View_group(const View_group&) = delete;
 		View_group& operator=(const View_group&) = delete;
 

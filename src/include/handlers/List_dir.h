@@ -29,6 +29,7 @@
 
 namespace hawk {
 	class Cursor_cache;
+	class View_group;
 
 	class List_dir : public View
 	{
@@ -52,8 +53,8 @@ namespace hawk {
 		Dir_cursor m_cursor;
 
 	public:
-		List_dir(Cursor_cache& cc)
-			: m_cursor_cache{cc}
+		List_dir(Cursor_cache& cc, View_group& parent)
+			: View{parent}, m_cursor_cache{cc}
 		{}
 
 		List_dir(const List_dir&) = delete;

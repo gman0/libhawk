@@ -26,6 +26,8 @@
 #include "Path.h"
 
 namespace hawk {
+	class View_group;
+
 	class View
 	{
 	public:
@@ -40,17 +42,23 @@ namespace hawk {
 		};
 
 	protected:
+		View_group* m_parent;
 		Path m_path;
 
 	public:
+		View(View_group& parent) : m_parent{&parent} {}
+
+		View(const View&) = delete;
+		View& operator=(const View&) = delete;
+
 		virtual ~View() = default;
 
 		const Path& get_path() const;
 		virtual void set_path(const Path& path);
 
 		// These two methods are called internally by hawk::View_group,
-		// encompassing set_path call. Views are thread-unsafe until ready()
-		// is called. Do your synchronization in here.
+		// encompassing set_path call. Views are thread-unsafe between
+		// not_ready() and ready() calls. Do your synchronization in here.
 		virtual void ready() noexcept = 0;
 		virtual void not_ready() noexcept = 0;
 	};

@@ -29,11 +29,12 @@
 #include "View.h"
 
 namespace hawk {
+	class View_group;
 	struct Magic_guard;
 
 	class View_types{
 	public:
-		using Handler = std::function<View*()>;
+		using Handler = std::function<View*(View_group&)>;
 
 	private:
 		mutable std::mutex m_mtx;

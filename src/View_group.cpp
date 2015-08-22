@@ -276,7 +276,7 @@ void View_group::update_paths(Path p)
 
 void View_group::add_view(const View_types::Handler& closure)
 {
-	m_views.emplace_back(static_cast<List_dir*>(closure()));
+	m_views.emplace_back(static_cast<List_dir*>(closure(*this)));
 }
 
 void View_group::ready_view(View& v, const Path& p)
@@ -312,11 +312,11 @@ void View_group::create_preview(const Path& p, bool set_cpath)
 	auto handler = m_view_types.get_handler(p);
 	if (!handler) return;
 
-	m_preview.reset(handler());
+	destroy_preview();
 	soft_interruption_point();
 
 	// ready_view() can throw, we need to separate the assignment to m_preview
-	View_ptr preview {handler()};
+	View_ptr preview {handler(*this)};
 	ready_view(*preview, p);
 
 	m_preview = std::move(preview);
