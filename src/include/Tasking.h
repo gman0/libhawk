@@ -56,7 +56,7 @@ namespace hawk {
 			  m_ready{true},
 			  m_eh{eh},
 			  m_current_priority{Priority::low},
-			  m_thread{[this]{ run(); }}
+			  m_thread{[this]{ run_tasking(); }}
 		{}
 
 		~Tasking();
@@ -64,20 +64,28 @@ namespace hawk {
 		// A task will interrupt and run only if its priority is
 		// is equal or higher than the priority of task currently being run.
 		// In that case it returns true.
-		bool run_task(Priority p, Task&& f);
-		bool run_blocking_task(Priority p, Task&& f);
-
+		bool run(Priority p, Task&& f);
 		// Runs tasks in succession (in forward order - from begin() to end()).
 		// Returns false only if the first task could not be run because
 		// of its low priority.
-		bool run_tasks(std::initializer_list<PTask> l);
+		bool run(std::initializer_list<PTask> l);
+		// Blocks the calling thread until f finishes.
+		bool run_blocking(Priority p, Task&& f);
+
+		// Runs a non-interrupting task. The calling thread blocks until the
+		// task currently being run finishes.
+		void run_noint(Priority p, Task&& f);
+		// Runs a non-interrupting blocking task. The calling thread blocks
+		// until the task currently being run finishes and then blocks until
+		// f finishes.
+		void run_noint_blocking(Priority p, Task&& f);
 
 	private:
-		void run();
+		void run_tasking();
 		void dispatch_tasks();
 
 		void start_tasks();
-		void end_tasks();
+		void stop_tasks();
 	};
 }
 

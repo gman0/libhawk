@@ -48,17 +48,12 @@ Tasking::~Tasking()
 		return;
 
 	m_thread.hard_interrupt();
-	run_task(Priority::high, []{
+	run(Priority::high, []{
 		for (;;) hard_interruption_point();
 	});
 }
 
-bool Tasking::run_task(Tasking::Priority p, Tasking::Task&& f)
-{
-	return run_tasks({ {p, std::move(f)} });
-}
-
-bool Tasking::run_tasks(std::initializer_list<PTask> l)
+bool Tasking::run(std::initializer_list<PTask> l)
 {
 	std::unique_lock<std::mutex> lk {m_mtx};
 
@@ -79,11 +74,16 @@ bool Tasking::run_tasks(std::initializer_list<PTask> l)
 	return true;
 }
 
-bool Tasking::run_blocking_task(Tasking::Priority p, Tasking::Task&& f)
+bool Tasking::run(Tasking::Priority p, Tasking::Task&& f)
+{
+	return run({ {p, std::move(f)} });
+}
+
+bool Tasking::run_blocking(Tasking::Priority p, Tasking::Task&& f)
 {
 	Barriere b;
 
-	bool r = run_task(p, [&]{
+	bool r = run(p, [&]{
 		Barriere_guard bg {b};
 		f();
 	});
@@ -93,7 +93,31 @@ bool Tasking::run_blocking_task(Tasking::Priority p, Tasking::Task&& f)
 	return r;
 }
 
-void Tasking::run()
+void Tasking::run_noint(Priority p, Tasking::Task&& f)
+{
+	std::unique_lock<std::mutex> lk {m_mtx};
+	m_cv.wait(lk, [this]{ return m_ready; });
+
+	m_ready = false;
+	m_current_priority = p;
+	m_tasks.emplace_back(p, std::move(f));
+
+	lk.unlock();
+	m_cv.notify_one();
+}
+
+void Tasking::run_noint_blocking(Tasking::Priority p, Tasking::Task&& f)
+{
+	Barriere b;
+	run_noint(p, [&]{
+		Barriere_guard bg {b};
+		f();
+	});
+
+	b.get_future().wait();
+}
+
+void Tasking::run_tasking()
 {
 	for (;;)
 	{
@@ -104,7 +128,7 @@ void Tasking::run()
 		catch (const Hard_thread_interrupt&) { return; }
 		catch (...) { m_eh(std::current_exception()); }
 
-		end_tasks();
+		stop_tasks();
 	}
 }
 
@@ -132,7 +156,7 @@ void Tasking::start_tasks()
 	m_cv.notify_one();
 }
 
-void Tasking::end_tasks()
+void Tasking::stop_tasks()
 {
 	std::unique_lock<std::mutex> lk {m_mtx};
 
