@@ -36,19 +36,6 @@ namespace hawk {
 
 namespace {
 
-std::vector<Path> dissect_path(Path& p, int nviews)
-{
-	std::vector<Path> paths(nviews + 1);
-
-	for (; nviews >= 0; nviews--)
-	{
-		paths[nviews] = p;
-		p.set_parent_path();
-	}
-
-	return paths;
-}
-
 int count_empty_views(const View_group::List_dir_vector& v)
 {
 	return std::count_if(v.begin(), v.end(), [](const auto& c) {
@@ -74,23 +61,6 @@ void check_and_rollback_path(Path& p, const Path& old_p)
 
 } // unnamed-namespace
 
-View_group::View_group(
-		const Path& p, int nviews, const View_types& vt,
-		Cursor_cache& cc, const Exception_handler& eh,
-		const View_types::Handler& primary_list_dir,
-		const View_types::Handler& secondary_list_dir,
-		std::chrono::milliseconds preview_delay)
-	:
-	  m_path{p},
-	  m_preview_delay{preview_delay},
-	  m_view_types{vt},
-	  m_cursor_cache{cc},
-	  m_tasking{eh},
-	  m_exception_handler{eh}
-{
-	build_views(nviews - 1, primary_list_dir, secondary_list_dir);
-}
-
 Path View_group::get_path() const
 {
 	std::shared_lock<std::shared_timed_mutex> lk {m_path_sm};
@@ -107,7 +77,7 @@ void View_group::set_path(Path p)
 	else
 		check_and_rollback_path(p, get_path());
 
-	m_tasking.run_tasks({
+	m_tasking.run({
 		{Tasking::Priority::high, [&, p]{
 			update_cursors(p);
 			update_paths(p);
@@ -128,7 +98,7 @@ void View_group::reload_path()
 	std::unique_lock<std::shared_timed_mutex> lk_path {m_path_sm};
 	check_and_rollback_path(m_path, m_path);
 
-	m_tasking.run_tasks({
+	m_tasking.run({
 		{Tasking::Priority::high, [this, l = {std::move(lk_path)}]{
 			 update_paths(m_path);
 		 }
@@ -159,7 +129,7 @@ Path View_group::get_cursor_path() const
 void View_group::set_cursor(const Path& filename,
 							List_dir::Cursor_search_direction dir)
 {
-	m_tasking.run_blocking_task(Tasking::Priority::low, [&]{
+	m_tasking.run_blocking(Tasking::Priority::low, [&]{
 		if (can_set_cursor())
 		{
 			List_dir_ptr& ld = m_views.back();
@@ -173,7 +143,7 @@ void View_group::set_cursor(const Path& filename,
 
 void View_group::advance_cursor(Dir_vector::difference_type d)
 {
-	m_tasking.run_blocking_task(Tasking::Priority::low, [&]{
+	m_tasking.run_blocking(Tasking::Priority::low, [&]{
 		if (can_set_cursor())
 		{
 			List_dir_ptr& ld = m_views.back();
@@ -187,7 +157,7 @@ void View_group::advance_cursor(Dir_vector::difference_type d)
 
 void View_group::rewind_cursor(List_dir::Cursor_position p)
 {
-	m_tasking.run_blocking_task(Tasking::Priority::low, [&]{
+	m_tasking.run_blocking(Tasking::Priority::low, [&]{
 		if (can_set_cursor())
 		{
 			List_dir_ptr& ld = m_views.back();
@@ -197,45 +167,6 @@ void View_group::rewind_cursor(List_dir::Cursor_position p)
 	});
 
 	delay_create_preview();
-}
-
-void View_group::build_views(
-		int nviews, const View_types::Handler& primary_ld,
-		const View_types::Handler& secondary_ld)
-{
-	instantiate_views(nviews, primary_ld, secondary_ld);
-	initialize_views(nviews);
-
-	update_active_cursor();
-}
-
-void View_group::instantiate_views(
-		int nviews, const View_types::Handler& primary_ld,
-		const View_types::Handler& secondary_ld)
-{
-	auto ld = m_view_types.get_handler(hash_list_dir());
-	assert(ld != nullptr && "No hawk::List_dir handler registered");
-
-	if (nviews > 0)
-	{
-		if (secondary_ld) ld = secondary_ld;
-		for (int i = 0; i < nviews; i++)
-			add_view(ld);
-	}
-
-	if (primary_ld) ld = primary_ld;
-	add_view(ld);
-}
-
-void View_group::initialize_views(int nviews)
-{
-	update_cursors(m_path);
-
-	Path p = m_path;
-	std::vector<Path> paths = dissect_path(p, nviews);
-
-	for (; nviews >= 0; nviews--)
-		ready_view(*m_views[nviews], paths[nviews]);
 }
 
 void View_group::update_cursors(Path path)
@@ -274,9 +205,18 @@ void View_group::update_paths(Path p)
 	destroy_free_dir_ptrs(count_empty_views(m_views) + 1);
 }
 
-void View_group::add_view(const View_types::Handler& closure)
+void View_group::add_view(const View_types::Handler& list_dir)
 {
-	m_views.emplace_back(static_cast<List_dir*>(closure(*this)));
+	m_tasking.run_noint_blocking(Tasking::Priority::high, [&]{
+		m_views.emplace_back(static_cast<List_dir*>(list_dir(*this)));
+	});
+}
+
+void View_group::remove_view()
+{
+	m_tasking.run_noint_blocking(Tasking::Priority::high, [&]{
+		m_views.erase(m_views.begin());
+	});
 }
 
 void View_group::ready_view(View& v, const Path& p)
@@ -345,7 +285,7 @@ void View_group::delay_preview()
 
 void View_group::delay_create_preview()
 {
-	m_tasking.run_task(Tasking::Priority::low, [this]{
+	m_tasking.run(Tasking::Priority::low, [this]{
 		delay_preview();
 
 		List_dir_ptr& ld = m_views.back();

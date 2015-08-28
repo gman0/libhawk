@@ -39,23 +39,22 @@ namespace hawk {
 
 	/// Exception safety
 	//  User's code can safely throw exceptions with these guarantees:
-	//   * throwing an exception during View_group initialization (ie. when
-	//     calling build_views - where the user code being the
-	//     constructor of a class inherting from View, set_path virtual
-	//     method and ready pure virtual method) causes the View_group to cease
-	//     its construction,
+	//   * throwing an exception while adding a view ceases its construction,
 	//   * throwing an exception while creating a preview
 	//     (ie. constructor, set_path, ready) causes the preview
 	//     to cease its construction,
 	//   * throwing an exception while setting View_group path by calling
-	//     set_path (which subsequently calls set_path of every View) causes
-	//     the path to be reset to its previous value. If this call fails
-	//     again by throwing an exception, the parent path of current path
-	//     will be used - this will continue in a loop until call to set_path
-	//     succeeds (thus the path may end up being "/").
+	//     set_path/reload_path (which subsequently calls set_path of every
+	//     View) causes the path to be reset to its previous value. If this
+	//     call fails  again by throwing an exception, the parent path of
+	//     current path will be used - this will continue in a loop until
+	//     call to set_path succeeds (thus the path may end up being "/").
 	//
 	//  Any exception thrown in any of these scenarios will be rethrown back
-	//  to the user.
+	//  to the user via the exception handler.
+	//
+	/// Thread safety
+	//  All methods are thread-safe unless stated otherwise.
 
 	// A note about View building: when calling build_views (during
 	// View_group construction), View constructors are called in forward order
@@ -89,23 +88,28 @@ namespace hawk {
 		Tasking::Exception_handler m_exception_handler;
 
 	public:
-
-		// secondary_list_dir is used for all nviews views and
-		// primary_list_dir is used for the last (nviews+1)-th view.
-		// Note that both primary_list_dir and secondary_list_dir
-		// may be null - in that case the List_dir handler registered
-		// in View_types will be used.
 		View_group(
-				const Path& p, int nviews, const View_types& vt,
-				Cursor_cache& cc, const Exception_handler& eh,
-				const View_types::Handler& primary_list_dir,
-				const View_types::Handler& secondary_list_dir,
-				std::chrono::milliseconds preview_delay);
+				const View_types& vt, Cursor_cache& cc,
+				const Exception_handler& eh,
+				std::chrono::milliseconds preview_delay)
+			: m_preview_delay{preview_delay},
+			  m_view_types{vt}, m_cursor_cache{cc},
+			  m_tasking{eh}, m_exception_handler{eh}
+		{}
 
 		virtual ~View_group() = default;
 
 		View_group(const View_group&) = delete;
 		View_group& operator=(const View_group&) = delete;
+
+		// Adds a List_dir view (or its derivates) to the view group.
+		// Note that the view's set_path is NOT called. View_group's
+		// set_path/reload_path needs to be called in order to get
+		// View::set_path called.
+		virtual void add_view(const View_types::Handler& list_dir);
+		// Removes a single view from the view group. Views are removed
+		// in reverse (LIFO).
+		virtual void remove_view();
 
 		Path get_path() const;
 		void set_path(Path path);
@@ -113,6 +117,8 @@ namespace hawk {
 		// Equivalent to calling set_path(get_path()) but atomic.
 		void reload_path();
 
+		// Warning: the returned std::vector causes a data race
+		//          with add_view and remove_view.
 		const List_dir_vector& get_views() const;
 
 		// Warning: the View pointed to by the returned pointer gets
@@ -130,13 +136,6 @@ namespace hawk {
 		void rewind_cursor(List_dir::Cursor_position p);
 
 	private:
-		void build_views(int nviews, const View_types::Handler& primary_ld,
-						 const View_types::Handler& secondary_ld);
-		void instantiate_views(
-				int nviews, const View_types::Handler& primary_ld,
-				const View_types::Handler& secondary_ld);
-		void initialize_views(int nviews);
-
 		void update_cursors(Path path);
 		void set_cursor_path(const Path& p);
 
@@ -144,8 +143,7 @@ namespace hawk {
 		void update_active_cursor();
 		bool can_set_cursor();
 
-		void add_view(const View_types::Handler& closure);
-		// Sets view's path and calls its ready().
+		// Constructs View::Ready_guard and sets the view's path.
 		void ready_view(View& v, const Path& path);
 
 		void create_preview(const Path& path, bool set_cpath);
