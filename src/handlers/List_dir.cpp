@@ -81,21 +81,20 @@ Dir_cursor match_directed_cursor(
 
 void List_dir::acquire_cursor()
 {
+	if (!m_dir_ptr)
+		return;
+
+	Dir_cursor cur = m_dir_ptr->begin();
+
 	if (size_t cursor_hash = m_cursor_cache.find(m_path.hash()))
 	{
 		// We found the hash of the cursor, now let's assign
 		// it to the correct Dir_vector item if we can.
-		m_cursor = match_cursor(*m_dir_ptr, cursor_hash, Dir_cursor{},
-								Cursor_search_direction::begin);
-
-		if (m_cursor != m_dir_ptr->end())
-			return;
+		cur = match_cursor(*m_dir_ptr, cursor_hash, Dir_cursor{},
+						   Cursor_search_direction::begin);
 	}
 
-	// We didn't find the cursor, let's use the first
-	// item of our Dir_vector as the cursor (or the
-	// end() iterator if the vector is empty).
-	m_cursor = m_dir_ptr->begin();
+	set_cursor(cur);
 }
 
 void List_dir::update_cursor_cache()
@@ -106,22 +105,19 @@ void List_dir::update_cursor_cache()
 void List_dir::set_cursor(Dir_cursor cursor)
 {
 	m_cursor = cursor;
-
-	if (m_dir_ptr->empty())
-		return;
-
-	m_cursor_cache.store(m_path.hash(), m_cursor->path.hash());
+	on_set_cursor();
 }
 
 void List_dir::set_cursor(const Path& filename, Cursor_search_direction dir)
 {
-	Dir_cursor cursor = match_directed_cursor(
+	Dir_cursor cur = match_directed_cursor(
 				filename, *m_dir_ptr, m_cursor, dir, m_path);
 
-	if (cursor != m_dir_ptr->end())
-		set_cursor(cursor);
-	else
-		set_cursor(m_dir_ptr->begin());
+	if (cur == m_dir_ptr->end())
+		cur = m_dir_ptr->begin();
+
+	set_cursor(cur);
+	update_cursor_cache();
 }
 
 void List_dir::advance_cursor(Dir_vector::difference_type d)
@@ -141,7 +137,10 @@ void List_dir::advance_cursor(Dir_vector::difference_type d)
 			d = -dist;
 	}
 
-	std::advance(m_cursor, d);
+	Dir_cursor cur = m_cursor;
+	std::advance(cur, d);
+	set_cursor(cur);
+
 	update_cursor_cache();
 }
 
@@ -149,11 +148,10 @@ void List_dir::rewind_cursor(List_dir::Cursor_position pos)
 {
 	if (!m_dir_ptr || m_dir_ptr->empty()) return;
 
-	if (pos == Cursor_position::beg)
-		m_cursor = m_dir_ptr->begin();
-	else
-		m_cursor = --m_dir_ptr->end();
+	Dir_cursor cur = (pos == Cursor_position::beg)
+			? m_dir_ptr->begin() : --m_dir_ptr->end();
 
+	set_cursor(cur);
 	update_cursor_cache();
 }
 
@@ -194,7 +192,6 @@ void List_dir::set_path(const Path& dir)
 
 	View::set_path(dir);
 	load_dir_ptr(m_dir_ptr, dir);
-	acquire_cursor();
 }
 
 const Dir_vector* List_dir::get_contents() const

@@ -74,17 +74,24 @@ namespace hawk {
 		bool try_get_const_cursor(const Path& filename, Dir_const_cursor& cur,
 								  Cursor_search_direction dir);
 
-		void set_cursor(Dir_cursor cursor);
 		void set_cursor(const Path& filename, Cursor_search_direction dir);
-
 		void advance_cursor(Dir_vector::difference_type d);
 		void rewind_cursor(Cursor_position pos);
 
 		virtual void set_path(const Path& path);
 
-	private:
-		void update_cursor_cache();
+	protected:
+		// Tries to retrieve the cursor from the cursor cache. If it fails,
+		// it's set to begin() iterator. Call this method after setting the
+		// path, e.g. in your ready().
 		void acquire_cursor();
+
+		// This method is called every time the cursor is set.
+		virtual void on_set_cursor() noexcept {}
+
+	private:
+		void set_cursor(Dir_cursor cursor);
+		void update_cursor_cache();
 	};
 }
 
