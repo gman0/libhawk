@@ -6,7 +6,7 @@ set(CMAKE_CXX_FLAGS "-std=c++1y -Wall -pedantic -g -O0 -fPIC \
 
 include_directories("include")
 
-file(GLOB_RECURSE srcs "./*.cpp")
+file(GLOB_RECURSE srcs "./*.cpp" "./include/*.h")
 add_library(hawk_obj OBJECT ${srcs})
 add_library(hawk_static STATIC $<TARGET_OBJECTS:hawk_obj>)
 add_library(hawk SHARED $<TARGET_OBJECTS:hawk_obj>)
