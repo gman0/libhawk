@@ -28,7 +28,7 @@
 #include <chrono>
 #include "Path.h"
 #include "View_types.h"
-#include "Dir_cache.h"
+#include "dir-cache/Dir_entry.h"
 #include "Tasking.h"
 #include "handlers/List_dir.h"
 

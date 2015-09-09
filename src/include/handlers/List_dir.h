@@ -25,7 +25,7 @@
 #include <ctime>
 #include <utility>
 #include "View.h"
-#include "Dir_cache.h"
+#include "dir-cache/Dir_entry.h"
 
 namespace hawk {
 	class Cursor_cache;

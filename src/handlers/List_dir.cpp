@@ -24,9 +24,9 @@
 #include <unistd.h>
 #include "handlers/List_dir.h"
 #include "handlers/List_dir_hash.h"
+#include "dir-cache/Dir_cache.h"
 #include "View_group.h"
 #include "Cursor_cache.h"
-#include "View.h"
 #include "Filesystem.h"
 
 namespace hawk {
@@ -192,6 +192,7 @@ void List_dir::set_path(const Path& dir)
 
 	View::set_path(dir);
 	load_dir_ptr(m_dir_ptr, dir);
+
 }
 
 const Dir_vector* List_dir::get_contents() const

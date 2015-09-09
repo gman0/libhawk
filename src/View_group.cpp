@@ -26,7 +26,6 @@
 #include "View.h"
 #include "handlers/List_dir.h"
 #include "handlers/List_dir_hash.h"
-#include "Dir_cache.h"
 #include "Cursor_cache.h"
 #include "Interruptible_thread.h"
 #include "Interrupt.h"
@@ -35,13 +34,6 @@
 namespace hawk {
 
 namespace {
-
-int count_empty_views(const View_group::List_dir_vector& v)
-{
-	return std::count_if(v.begin(), v.end(), [](const auto& c) {
-		return c->get_path().empty();
-	});
-}
 
 // Checks path for validity
 void check_and_rollback_path(Path& p, const Path& old_p)
@@ -100,6 +92,7 @@ void View_group::reload_path()
 
 	m_tasking.run({
 		{Tasking::Priority::high, [this, l = {std::move(lk_path)}]{
+			 update_cursors(m_path);
 			 update_paths(m_path);
 		 }
 		},
@@ -201,8 +194,6 @@ void View_group::update_paths(Path p)
 		p.set_parent_path();
 		ready_view(*m_views[i], p);
 	}
-
-	destroy_free_dir_ptrs(count_empty_views(m_views) + 1);
 }
 
 void View_group::add_view(const View_types::Handler& list_dir)
