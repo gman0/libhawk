@@ -98,7 +98,7 @@ void start_filesystem_watchdog(std::chrono::milliseconds update_interval,
 
 	if (enabled_watchdogs & WD_NATIVE)
 	{
-		// TODO: choose the righ native Monitor type (depending on the system)
+		// TODO: choose the right native Monitor type (depending on the system)
 		// at compile-time.
 
 		auto native_mon = std::make_unique<Inotify_monitor>(update_interval);
@@ -110,10 +110,12 @@ void start_filesystem_watchdog(std::chrono::milliseconds update_interval,
 void load_dir_ptr(Dir_ptr& ptr, const Path& directory, bool force_reload)
 {
 	ptr.reset();
-	if (force_reload) storage->mark_dirty(directory);
 
-	watch_directory(directory);
+	if (force_reload)
+		storage->mark_dirty(directory);
+
 	ptr = storage->get(directory);
+	watch_directory(directory);
 }
 
 } // namespace hawk
