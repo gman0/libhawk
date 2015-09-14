@@ -53,12 +53,14 @@ namespace hawk {
 	//  Any exception thrown in any of these scenarios will be rethrown back
 	//  to the user via the exception handler.
 	//
-	/// Thread safety
+	/// Thread safety and threads
 	//  All methods are thread-safe unless stated otherwise.
+	//  set_path and reload_path are executed asynchronously, creating a preview
+	//  is asynchronous as well.
+	//  Subsequent calls to set_path/reload_path may result in an interrupt
+	//  which causes any set-path task that may be running at the
+	//  moment to stop--replacing it with the most recent set-path task.
 
-	// A note about View building: when calling build_views (during
-	// View_group construction), View constructors are called in forward order
-	// but their ready methods are called in reverse.
 	class View_group
 	{
 	public:
@@ -103,7 +105,7 @@ namespace hawk {
 		View_group& operator=(const View_group&) = delete;
 
 		// Adds a List_dir view (or its derivates) to the view group.
-		// Note that the view's set_path is NOT called. View_group's
+		// Note that the View's set_path is NOT called. View_group's
 		// set_path/reload_path needs to be called in order to get
 		// View::set_path called.
 		virtual void add_view(const View_types::Handler& list_dir);

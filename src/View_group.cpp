@@ -92,8 +92,8 @@ void View_group::reload_path()
 
 	m_tasking.run({
 		{Tasking::Priority::high, [this, l = {std::move(lk_path)}]{
-			 update_cursors(m_path);
 			 update_paths(m_path);
+			 update_cursors(m_path);
 		 }
 		},
 		{Tasking::Priority::low, [this]{
@@ -220,11 +220,19 @@ void View_group::update_active_cursor()
 {
 	set_cursor_path("");
 
-	if (can_set_cursor())
+	if (!can_set_cursor())
+		return;
+
+	List_dir_ptr& ld = m_views.back();
+
+	if (!exists(ld->get_path() / ld->get_cursor()->path))
 	{
-		List_dir_ptr& ld = m_views.back();
-		create_preview({ld->get_path() / ld->get_cursor()->path}, true);
+		// The item ld was pointing to has been deleted,
+		// rewind the cursor back to the beginning.
+		ld->rewind_cursor(List_dir::Cursor_position::beg);
 	}
+
+	create_preview(ld->get_path() / ld->get_cursor()->path, true);
 }
 
 bool View_group::can_set_cursor()
@@ -246,7 +254,7 @@ void View_group::create_preview(const Path& p, bool set_cpath)
 	destroy_preview();
 	soft_interruption_point();
 
-	// ready_view() can throw, we need to separate the assignment to m_preview
+	// ready_view() can throw, we need to separate the assignment to m_preview.
 	View_ptr preview {handler(*this)};
 	ready_view(*preview, p);
 
