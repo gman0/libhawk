@@ -72,7 +72,7 @@ void set_on_sort_change(On_sort_change&& fn)
 	callbacks.on_sort_change = std::move(fn);
 }
 
-void init_dir_cache(uint64_t free_threshold)
+void init_dir_cache(size_t free_threshold)
 {
 	storage = std::make_unique<Cache_storage>(free_threshold,
 		[](const Path& p) noexcept {

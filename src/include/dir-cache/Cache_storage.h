@@ -61,12 +61,12 @@ namespace hawk {
 
 		std::mutex m_entries_mtx;
 		Entries m_entries;
-		uint64_t m_free_threshold;
+		size_t m_free_threshold;
 
 		On_dir_ptr_free m_on_free;
 
 	public:
-		Cache_storage(uint64_t free_threshold, On_dir_ptr_free&& on_ptr_free)
+		Cache_storage(size_t free_threshold, On_dir_ptr_free&& on_ptr_free)
 			:
 			  m_free_threshold{free_threshold},
 			  m_on_free{std::move(on_ptr_free)}

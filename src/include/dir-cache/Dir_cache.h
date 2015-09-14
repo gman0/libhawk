@@ -34,7 +34,7 @@ namespace hawk
 
 	// Initialises the directory cache.
 	// See dir-cache/Cache_storage.h
-	void init_dir_cache(uint64_t free_threshold);
+	void init_dir_cache(size_t free_threshold);
 
 	enum Enabled_watchdogs { WD_POLL = 1, WD_NATIVE = 2 };
 	// Watches directories for changes and calls On_fs_change
