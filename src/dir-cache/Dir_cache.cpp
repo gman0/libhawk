@@ -20,12 +20,14 @@
 #include <utility>
 #include <functional>
 #include <memory>
+#include <sys/vfs.h>
+#include </usr/include/linux/magic.h>
 #include "Filesystem.h"
 #include "dir-cache/Dir_cache.h"
 #include "dir-cache/Cache_storage.h"
 #include "dir-watchdog/Dir_watchdog.h"
 #include "dir-watchdog/Poll_monitor.h"
-
+#include "dir-watchdog/Inotify_monitor.h"
 
 namespace hawk {
 
@@ -37,17 +39,23 @@ struct
 	std::unique_ptr<Dir_watchdog> poll;
 } watchdog;
 
-std::unique_ptr<Cache_storage> storage;
-
 struct
 {
 	On_fs_change on_fs_change;
 	On_sort_change on_sort_change;
 } callbacks;
 
+std::unique_ptr<Cache_storage> storage;
+
 void watch_directory(const Path& p)
 {
-	if (watchdog.poll)
+	struct statfs st;
+	if (statfs(p.c_str(), &st) < 0)
+		throw Filesystem_error {p, errno};
+
+	if (watchdog.native && st.f_type != NFS_SUPER_MAGIC)
+		watchdog.native->add_path(p);
+	else
 		watchdog.poll->add_path(p);
 }
 
@@ -68,18 +76,35 @@ void init_dir_cache(uint64_t free_threshold)
 {
 	storage = std::make_unique<Cache_storage>(free_threshold,
 		[](const Path& p) noexcept {
-			watchdog.poll->remove_path(p);
+			if (watchdog.native)
+				watchdog.native->remove_path(p);
+
+			if (watchdog.poll)
+				watchdog.poll->remove_path(p);
 		});
 }
 
 void start_filesystem_watchdog(std::chrono::milliseconds update_interval,
-							   On_fs_change&& fn)
+							   int enabled_watchdogs, On_fs_change&& fn)
 {
 	callbacks.on_fs_change = std::move(fn);
 
-	auto poll_mon = std::make_unique<Poll_monitor>(update_interval);
-	watchdog.poll = std::make_unique<Dir_watchdog>(
-				std::move(poll_mon), &watchdog_notify);
+	if (enabled_watchdogs & WD_POLL)
+	{
+		auto poll_mon = std::make_unique<Poll_monitor>(update_interval);
+		watchdog.poll = std::make_unique<Dir_watchdog>(
+					std::move(poll_mon), &watchdog_notify);
+	}
+
+	if (enabled_watchdogs & WD_NATIVE)
+	{
+		// TODO: choose the righ native Monitor type (depending on the system)
+		// at compile-time.
+
+		auto native_mon = std::make_unique<Inotify_monitor>(update_interval);
+		watchdog.native = std::make_unique<Dir_watchdog>(
+					std::move(native_mon), &watchdog_notify);
+	}
 }
 
 void load_dir_ptr(Dir_ptr& ptr, const Path& directory, bool force_reload)

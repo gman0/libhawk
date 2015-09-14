@@ -35,10 +35,13 @@ namespace hawk
 	// Initialises the directory cache.
 	// See dir-cache/Cache_storage.h
 	void init_dir_cache(uint64_t free_threshold);
-	// Watches required directories for changes and calls On_fs_change
+
+	enum Enabled_watchdogs { WD_POLL = 1, WD_NATIVE = 2 };
+	// Watches directories for changes and calls On_fs_change
 	// upon a change. See dir-watchdog/Dir_watchdog.h
-	void start_filesystem_watchdog(
-			std::chrono::milliseconds update_interval, On_fs_change&& fn);
+	void start_filesystem_watchdog(std::chrono::milliseconds update_interval,
+								   int enabled_watchdogs,
+								   On_fs_change&& fn);
 
 	// Returns a shared pointer with sorted directory entries.
 	// The directory path is checked by filesystem-watchdog for changes and
