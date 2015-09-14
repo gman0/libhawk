@@ -89,8 +89,7 @@ namespace hawk {
 		// has been reaquired.
 		Entry* try_reaquire(std::unique_lock<std::mutex>& entry_lk);
 
-		Entry& insert_and_build(
-				const Path& p, std::unique_lock<std::mutex>& entry_lk);
+		Entry& insert(const Path& p, std::unique_lock<std::mutex>& entry_lk);
 		void build_entry(Entry& ent, const Path& p);
 	};
 }

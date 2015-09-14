@@ -27,7 +27,7 @@ Dir_ptr Cache_storage::get(const Path& dir)
 	Entry* ent = free_and_find(dir, lk);
 
 	if (!ent) ent = try_reaquire(lk);
-	if (!ent) ent = &insert_and_build(dir, lk);
+	if (!ent) ent = &insert(dir, lk);
 
 	if (ent->st != Entry::acquired)
 		build_entry(*ent, dir);
@@ -121,7 +121,7 @@ Cache_storage::Entry* Cache_storage::try_reaquire(
 	return nullptr;
 }
 
-Cache_storage::Entry& Cache_storage::insert_and_build(
+Cache_storage::Entry& Cache_storage::insert(
 		const Path& p, std::unique_lock<std::mutex>& entry_lk)
 {
 	Entry* ent;
@@ -133,8 +133,6 @@ Cache_storage::Entry& Cache_storage::insert_and_build(
 		entry_lk = std::unique_lock<std::mutex> {ent->m};
 		ent->ptr = std::make_unique<Dir_vector>();
 	}
-
-	build_entry(*ent, p);
 
 	return *ent;
 }
