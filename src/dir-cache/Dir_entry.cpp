@@ -112,4 +112,4 @@ void populate_directory(Dir_vector& vec, const Path& dir)
 	sort(vec);
 }
 
-}
+} // namespace hawk
