@@ -114,4 +114,18 @@ namespace hawk {
 	bool is_absolute(const char* path);
 }
 
+namespace std {
+	template <>
+	struct hash<hawk::Path>
+	{
+		using argument_type = hawk::Path;
+		using result_type   = size_t;
+
+		result_type operator()(const argument_type& p) const
+		{
+			return p.hash();
+		}
+	};
+}
+
 #endif // HAWK_PATH_H
