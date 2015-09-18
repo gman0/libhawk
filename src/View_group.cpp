@@ -134,6 +134,20 @@ void View_group::set_cursor(const Path& filename,
 	delay_create_preview();
 }
 
+void View_group::set_cursor(Dir_vector::size_type index)
+{
+	m_tasking.run_blocking(Tasking::Priority::low, [&]{
+		if (can_set_cursor())
+		{
+			List_dir_ptr& ld = m_views.back();
+			ld->set_cursor(index);
+			set_cursor_path(m_path / ld->get_cursor()->path);
+		}
+	});
+
+	delay_create_preview();
+}
+
 void View_group::advance_cursor(Dir_vector::difference_type d)
 {
 	m_tasking.run_blocking(Tasking::Priority::low, [&]{
@@ -221,7 +235,10 @@ void View_group::update_active_cursor()
 	set_cursor_path("");
 
 	if (!can_set_cursor())
+	{
+		destroy_preview();
 		return;
+	}
 
 	List_dir_ptr& ld = m_views.back();
 
@@ -237,9 +254,7 @@ void View_group::update_active_cursor()
 
 bool View_group::can_set_cursor()
 {
-	destroy_preview();
 	const Dir_vector* dir = m_views.back()->get_contents();
-
 	return dir && !dir->empty();
 }
 
@@ -248,10 +263,18 @@ void View_group::create_preview(const Path& p, bool set_cpath)
 	if (set_cpath)
 		set_cursor_path(p);
 
+	if (m_preview && m_view_types.get_mime(p)
+		== m_view_types.get_mime(m_preview->get_path()))
+	{
+		ready_view(*m_preview, p);
+		return;
+	}
+
+	destroy_preview();
+
 	auto handler = m_view_types.get_handler(p);
 	if (!handler) return;
 
-	destroy_preview();
 	soft_interruption_point();
 
 	// ready_view() can throw, we need to separate the assignment to m_preview.

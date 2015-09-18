@@ -133,7 +133,9 @@ namespace hawk {
 		void set_cursor(const Path& filename,
 				List_dir::Cursor_search_direction dir =
 					List_dir::Cursor_search_direction::begin);
+		void set_cursor(Dir_vector::size_type index);
 
+		// Advances the cursor by d entries relative to the current cursor.
 		void advance_cursor(Dir_vector::difference_type d);
 		void rewind_cursor(List_dir::Cursor_position p);
 
