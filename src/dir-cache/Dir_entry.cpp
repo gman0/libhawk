@@ -19,6 +19,7 @@
 
 #include <algorithm>
 #include <future>
+#include <atomic>
 #include "Interrupt.h"
 #include "Filesystem.h"
 #include "dir-cache/Dir_entry.h"
@@ -33,38 +34,40 @@ struct
 	Populate_user_data populate_udata;
 } callbacks;
 
-constexpr int sort_granularity = 10000;
+constexpr int sort_granularity = 1000;
 
-void parallel_sort(size_t beg, size_t end, Dir_vector& vec)
+void parallel_sort(
+		std::atomic<int>& nt, size_t beg, size_t end, Dir_vector& vec)
 {
-	Dir_vector::iterator start_it = vec.begin();
+	auto vbeg_it = vec.begin();
 
-	size_t d = end - beg;
-	if (d < sort_granularity)
-		std::sort(start_it + beg, start_it + end, callbacks.sort_pred);
-	else
+	if (end - beg < sort_granularity)
 	{
-		const size_t sz = vec.size();
-		size_t next_beg = end;
-		size_t next_end = next_beg + sort_granularity;
-
-		if (next_end > sz)
-			next_end = sz;
-
-		auto beg_it = start_it + beg;
-		auto next_beg_it = start_it + next_beg;
-		auto next_end_it = start_it + next_end;
-
-		soft_interruption_point();
-
-		auto f = std::async(std::launch::async, parallel_sort, next_beg,
-							next_end, std::ref(vec));
-		std::sort(beg_it, start_it + end, callbacks.sort_pred);
-		f.wait();
-
-		std::inplace_merge(beg_it, next_beg_it,
-						   next_end_it, callbacks.sort_pred);
+		std::sort(vbeg_it + beg, vec.end(), callbacks.sort_pred);
+		return;
 	}
+
+	auto beg_it = vbeg_it + beg;
+	auto end_it = vbeg_it + end;
+
+	auto nbeg_it = end_it;
+	auto nend_it = nbeg_it + sort_granularity;
+	if (nend_it > vbeg_it + vec.size())
+		nend_it = vec.end();
+
+	soft_interruption_point();
+
+	std::launch launch_policy = (nt-- > 0)
+			? std::launch::async : std::launch::deferred;
+
+	auto f = std::async(launch_policy, &parallel_sort, std::ref(nt),
+						nbeg_it - vbeg_it, nend_it - vbeg_it, std::ref(vec));
+	std::sort(beg_it, end_it, callbacks.sort_pred);
+
+	nt++;
+	f.wait();
+
+	std::inplace_merge(beg_it, nbeg_it, nend_it, callbacks.sort_pred);
 }
 
 } // unnamed-namespace
@@ -87,7 +90,10 @@ Dir_sort_predicate get_sort_predicate()
 void sort(Dir_vector& vec)
 {
 	if (callbacks.sort_pred)
-		parallel_sort(0, vec.size(), vec);
+	{
+		std::atomic<int> nt(std::thread::hardware_concurrency());
+		parallel_sort(nt, 0, vec.size(), vec);
+	}
 }
 
 void populate_user_data(const Path& parent, Dir_entry& ent)
@@ -104,12 +110,20 @@ void populate_directory(Dir_vector& vec, const Path& dir)
 
 		Dir_entry ent;
 		ent.path = *it;
-		populate_user_data(dir, ent);
 
 		vec.push_back(std::move(ent));
 	}
 
-	sort(vec);
+	if (callbacks.populate_udata)
+	{
+		for (Dir_entry& ent : vec)
+		{
+			soft_interruption_point();
+			callbacks.populate_udata({dir / ent.path}, ent.user_data);
+		}
+	}
+
+	hawk::sort(vec);
 }
 
 } // namespace hawk
