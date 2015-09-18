@@ -75,6 +75,7 @@ namespace hawk {
 								  Cursor_search_direction dir);
 
 		void set_cursor(const Path& filename, Cursor_search_direction dir);
+		void set_cursor(Dir_vector::size_type index);
 		void advance_cursor(Dir_vector::difference_type d);
 		void rewind_cursor(Cursor_position pos);
 

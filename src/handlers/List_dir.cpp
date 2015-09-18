@@ -120,6 +120,16 @@ void List_dir::set_cursor(const Path& filename, Cursor_search_direction dir)
 	update_cursor_cache();
 }
 
+void List_dir::set_cursor(Dir_vector::size_type index)
+{
+	Dir_cursor cur;
+	if (index >= m_dir_ptr->size())
+		cur = m_dir_ptr->begin();
+
+	set_cursor(m_dir_ptr->begin() + index);
+	update_cursor_cache();
+}
+
 void List_dir::advance_cursor(Dir_vector::difference_type d)
 {
 	if (!m_dir_ptr || m_dir_ptr->empty()) return;
